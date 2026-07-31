@@ -4,6 +4,7 @@ import {
   hourMatrix,
   monthRange,
   playsIn,
+  skipStats,
   streaks,
   topArtists,
   topTracks,
@@ -41,6 +42,7 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
   const tracks = useMemo(() => topTracks(periodPlays, durations, 5), [periodPlays, durations])
   const matrix = useMemo(() => hourMatrix(periodPlays, durations), [periodPlays, durations])
   const s = useMemo(() => streaks(plays), [plays])
+  const sk = useMemo(() => skipStats(periodPlays, 3), [periodPlays])
 
   const cardData: CardData = useMemo(
     () => ({
@@ -174,6 +176,32 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
               <div className="card-title">When you listen</div>
               <Heatmap matrix={matrix} />
             </div>
+            {sk.skips > 0 && (
+              <div className="card">
+                <div className="card-title">
+                  Skipped
+                  <span className="aside">{Math.round(sk.skipRate * 100)}% of starts</span>
+                </div>
+                <div className="rank-list">
+                  {sk.topSkipped.map((item, i) => (
+                    <div className="rank-row" key={`${item.sub}|${item.name}`}>
+                      <div className="rank-num">{i + 1}</div>
+                      <div className="rank-main">
+                        <div className="rank-name">{item.name}</div>
+                        <div className="rank-sub">{item.sub}</div>
+                      </div>
+                      <div className="rank-count">
+                        {fmtInt(item.plays)}
+                        <span className="unit">skips</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="note" style={{ marginTop: 6 }}>
+                  {fmtInt(sk.skips)} skips against {fmtInt(sk.plays)} full plays in {range.label}.
+                </div>
+              </div>
+            )}
             <div className="card">
               <div className="card-title">Streaks</div>
               <div className="recap-strip" style={{ marginTop: 4 }}>

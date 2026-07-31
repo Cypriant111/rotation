@@ -18,7 +18,7 @@ export function Home({ goToSettings }: { goToSettings: () => void }) {
   const periodPlays = useMemo(() => playsIn(plays, from), [plays, from])
   const t = useMemo(() => totals(periodPlays, durations), [periodPlays, durations])
   const series = useMemo(() => daySeries(periodPlays, from, durations), [periodPlays, from, durations])
-  const recent = plays.slice(0, 10)
+  const recent = useMemo(() => plays.filter((p) => !p.skip).slice(0, 10), [plays])
 
   const hasAnything = plays.length > 0
   const connected = Boolean(settings.lastfmUser)

@@ -3,15 +3,17 @@ import { useApp } from './state/store'
 import { applyUpdate, onUpdateReady } from './lib/sw'
 import { Home } from './screens/Home'
 import { Top } from './screens/Top'
+import { Mixes } from './screens/Mixes'
 import { Recap } from './screens/Recap'
 import { Settings } from './screens/Settings'
-import { IconCharts, IconHome, IconRecap, IconSettings } from './components/Icons'
+import { IconCharts, IconHome, IconMixes, IconRecap, IconSettings } from './components/Icons'
 
-type Tab = 'home' | 'top' | 'recap' | 'settings'
+type Tab = 'home' | 'top' | 'mixes' | 'recap' | 'settings'
 
 const TABS: { key: Tab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
   { key: 'home', label: 'Home', icon: () => <IconHome /> },
   { key: 'top', label: 'Top', icon: () => <IconCharts /> },
+  { key: 'mixes', label: 'Mixes', icon: () => <IconMixes /> },
   { key: 'recap', label: 'Recap', icon: () => <IconRecap /> },
   { key: 'settings', label: 'Settings', icon: () => <IconSettings /> },
 ]
@@ -75,6 +77,9 @@ export default function App() {
       </div>
       <div hidden={tab !== 'top'}>
         <Top />
+      </div>
+      <div hidden={tab !== 'mixes'}>
+        <Mixes showToast={setToast} />
       </div>
       <div hidden={tab !== 'recap'}>
         <Recap showToast={setToast} />

@@ -4,8 +4,18 @@ Your Apple Music listening stats, on your iPhone home screen.
 
 Rotation is a small installable web app (PWA) that tracks what you listen to on
 Apple Music and turns it into stats: minutes listened, plays, top artists /
-songs / albums, a listening-clock heatmap, streaks, and shareable recap cards.
-Everything is stored on your device - there is no backend and no account.
+songs / albums, a listening-clock heatmap, streaks, skip analytics, and
+shareable recap cards. Everything is stored on your device - there is no
+backend and no account.
+
+The **Mixes** tab distills the data into playlist-shaped lists of what you
+actually like: *Heavy Rotation* (recency-weighted plays, corrected by how often
+you finish the song and how many separate days you reached for it), *On the
+Rise* (surging against your own baseline), *Old Flames* (heavily played, gone
+quiet for 60+ days), and *No Skips* (never once cut short - appears when skip
+data exists, i.e. after a CSV import). Each mix can be copied or shared as
+"Artist - Song" lines (playlist-importer Shortcuts read that format), and each
+row opens the song in Apple Music.
 
 ## How it gets your listening data
 

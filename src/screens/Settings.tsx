@@ -19,8 +19,15 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
   const counts = useMemo(() => {
     let lastfm = 0
     let csv = 0
-    for (const p of plays) p.source === 'lastfm' ? lastfm++ : csv++
-    return { lastfm, csv }
+    let skips = 0
+    for (const p of plays) {
+      if (p.skip) {
+        skips++
+        continue
+      }
+      p.source === 'lastfm' ? lastfm++ : csv++
+    }
+    return { lastfm, csv, skips }
   }, [plays])
 
   const connected = Boolean(settings.lastfmUser)
@@ -212,6 +219,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           {importResult && (
             <div className="inline-ok">
               Imported {fmtInt(importResult.imported)} plays
+              {importResult.skipEvents > 0 ? ` and ${fmtInt(importResult.skipEvents)} skips` : ''}
               {importResult.duplicates > 0 ? `, skipped ${fmtInt(importResult.duplicates)} already tracked` : ''}
               {importResult.firstTs
                 ? ` (${new Date(importResult.firstTs).getFullYear()}–${new Date(importResult.lastTs!).getFullYear()})`
@@ -243,7 +251,9 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
             <div>
               All plays
               <div className="hint">
-                {fmtInt(plays.length)} total · {fmtInt(counts.lastfm)} Last.fm · {fmtInt(counts.csv)} imported
+                {fmtInt(counts.lastfm + counts.csv)} plays · {fmtInt(counts.lastfm)} Last.fm ·{' '}
+                {fmtInt(counts.csv)} imported
+                {counts.skips > 0 ? ` · ${fmtInt(counts.skips)} skips` : ''}
               </div>
             </div>
             <button className="trailing" style={{ color: 'var(--accent)', fontWeight: 600 }} onClick={exportJson}>

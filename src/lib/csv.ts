@@ -125,7 +125,12 @@ export function parsePlayActivityRow(
 
   const playMs = Number(m.playMs ? row[m.playMs] : 0) || 0
   const mediaMs = Number(m.mediaMs ? row[m.mediaMs] : 0) || 0
-  if (playMs <= 0 || !countsAsPlay(playMs, mediaMs)) return null
+  if (playMs <= 0) return null
+  const isPlay = countsAsPlay(playMs, mediaMs)
+  // a cut-short track with an explicit skip end-reason is a skip event
+  const endReason = m.endReason ? (row[m.endReason] ?? '') : ''
+  const isSkip = !isPlay && endReason.includes('SKIPPED')
+  if (!isPlay && !isSkip) return null
 
   const startRaw = m.eventStart ? row[m.eventStart] : ''
   const endRaw = m.eventEnd ? row[m.eventEnd] : ''
@@ -143,13 +148,14 @@ export function parsePlayActivityRow(
   const ms = Math.min(playMs, mediaMs > 0 ? mediaMs : playMs, 4 * 3_600_000)
 
   return {
-    id: `csv:${ts}:${hash(norm(artist) + ' ' + norm(track))}`,
+    id: `${isSkip ? 'csvs' : 'csv'}:${ts}:${hash(norm(artist) + ' ' + norm(track))}`,
     ts,
     track,
     artist: artist || 'Unknown Artist',
     album: (m.album ? row[m.album] : '').trim(),
     ms,
     ...(Number.isFinite(offS) ? { off: Math.round(offS / 60) } : {}),
+    ...(isSkip ? { skip: true as const } : {}),
     source: 'csv' as const,
   }
 }
@@ -186,15 +192,22 @@ export function parseDailyTracksRow(
     .filter((h) => Number.isInteger(h) && h >= 0 && h <= 23)
   if (hours.length === 0) hours.push(12)
 
-  // skip-only rows carry Play Count 0 and must not fabricate a play
+  const plays: Play[] = []
+  const trackHash = hash(norm(artist) + ' ' + norm(track))
+  const displayArtist = artist || 'Unknown Artist'
+
+  // skip-only rows carry Play Count 0; their Skip Count is still real data
   const pcRaw = m.playCount ? Number(row[m.playCount]) : NaN
-  if (Number.isFinite(pcRaw) && Math.round(pcRaw) <= 0) return []
-  const playCount = Number.isFinite(pcRaw) ? Math.max(1, Math.round(pcRaw)) : 1
+  const playCount =
+    Number.isFinite(pcRaw) && Math.round(pcRaw) <= 0
+      ? 0
+      : Number.isFinite(pcRaw)
+        ? Math.max(1, Math.round(pcRaw))
+        : 1
   // Treated as the row total (SamTheGeek convention), split across plays
   const totalMs = Math.max(0, Number(m.playMs ? row[m.playMs] : 0) || 0)
-  const perPlayMs = totalMs > 0 ? Math.min(totalMs / playCount, 4 * 3_600_000) : 0
+  const perPlayMs = playCount > 0 && totalMs > 0 ? Math.min(totalMs / playCount, 4 * 3_600_000) : 0
 
-  const plays: Play[] = []
   for (let i = 0; i < playCount && i < 500; i++) {
     const hour = hours[i % hours.length]
     const ts = new Date(y, mo - 1, d, hour, 0, 0, i).getTime()
@@ -202,12 +215,30 @@ export function parseDailyTracksRow(
     plays.push({
       // rowSeq keeps ids unique when the same track/day appears in several
       // rollup rows (per end-reason/source buckets), and is stable per file
-      id: `csv:${ts}:${hash(norm(artist) + ' ' + norm(track))}:${rowSeq}:${i}`,
+      id: `csv:${ts}:${trackHash}:${rowSeq}:${i}`,
       ts,
       track,
-      artist: artist || 'Unknown Artist',
+      artist: displayArtist,
       album: '',
       ms: Math.round(perPlayMs),
+      source: 'csv',
+    })
+  }
+
+  const skRaw = m.skipCount ? Number(row[m.skipCount]) : NaN
+  const skipCount = Number.isFinite(skRaw) ? Math.min(100, Math.max(0, Math.round(skRaw))) : 0
+  for (let i = 0; i < skipCount; i++) {
+    const hour = hours[i % hours.length]
+    const ts = new Date(y, mo - 1, d, hour, 0, 0, i).getTime()
+    if (!Number.isFinite(ts)) continue
+    plays.push({
+      id: `csvs:${ts}:${trackHash}:${rowSeq}:${i}`,
+      ts,
+      track,
+      artist: displayArtist,
+      album: '',
+      ms: 0,
+      skip: true,
       source: 'csv',
     })
   }
@@ -217,6 +248,8 @@ export function parseDailyTracksRow(
 export interface ImportResult {
   kind: CsvKind
   imported: number
+  /** skip EVENTS imported (feeds skip analytics), not skipped rows */
+  skipEvents: number
   skipped: number
   duplicates: number
   firstTs: number | null
@@ -247,6 +280,7 @@ export function parseAppleCsv(
     let kind: CsvKind = 'unknown'
     let rows = 0
     let imported = 0
+    let skipEvents = 0
     let skipped = 0
     let duplicates = 0
     let firstTs: number | null = null
@@ -304,6 +338,12 @@ export function parseAppleCsv(
               continue
             }
             for (const p of parsed) {
+              if (p.skip) {
+                // skips re-imported from the same file collapse by id
+                pending.push(p)
+                skipEvents++
+                continue
+              }
               if (existingKeys.has(dedupeKey(p.artist, p.track, p.ts))) {
                 duplicates++
                 continue
@@ -326,7 +366,7 @@ export function parseAppleCsv(
         flushChain
           .then(() => {
             if (writeError) reject(writeError)
-            else resolve({ kind, imported, skipped, duplicates, firstTs, lastTs })
+            else resolve({ kind, imported, skipEvents, skipped, duplicates, firstTs, lastTs })
           })
           .catch(reject)
       },
@@ -340,10 +380,12 @@ export function dedupeKey(artist: string, track: string, ts: number): string {
   return `${norm(artist)}|${norm(track)}|${Math.round(ts / 300_000)}`
 }
 
-/** Keys for existing plays; includes neighbor buckets so boundary cases match. */
+/** Keys for existing plays; includes neighbor buckets so boundary cases match.
+ *  Skip events are excluded — a skip must never mask a real play as duplicate. */
 export function buildDedupeIndex(plays: Play[]): Set<string> {
   const set = new Set<string>()
   for (const p of plays) {
+    if (p.skip) continue
     const bucket = Math.round(p.ts / 300_000)
     const base = `${norm(p.artist)}|${norm(p.track)}|`
     set.add(base + (bucket - 1))

@@ -31,6 +31,16 @@ export function IconCharts({ size = 25 }: IconProps) {
   )
 }
 
+export function IconMixes({ size = 25 }: IconProps) {
+  return (
+    <svg {...base(size)} aria-hidden>
+      <path d="M4 6h11M4 11h11M4 16h7" />
+      <circle cx="16.5" cy="17" r="2.4" />
+      <path d="M18.9 17V8.5l2-1" />
+    </svg>
+  )
+}
+
 export function IconRecap({ size = 25 }: IconProps) {
   return (
     <svg {...base(size)} aria-hidden>

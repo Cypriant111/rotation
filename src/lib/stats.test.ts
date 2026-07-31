@@ -269,6 +269,7 @@ describe('csv row parsers', () => {
     mediaMs: 'Media Duration In Milliseconds',
     eventStart: 'Event Start Timestamp',
     eventType: 'Event Type',
+    endReason: 'End Reason Type',
     utcOffsetS: 'UTC Offset In Seconds',
   }
   const activityRow = {
@@ -300,6 +301,49 @@ describe('csv row parsers', () => {
     expect(
       parsePlayActivityRow({ ...activityRow, 'Event Type': 'PLAY_START' }, activityMap, new Map()),
     ).toBeNull()
+  })
+
+  it('cut-short skipped tracks become skip events, other short stops are dropped', () => {
+    const short = {
+      ...activityRow,
+      'Play Duration Milliseconds': '9000',
+      'End Reason Type': 'TRACK_SKIPPED_FORWARDS',
+    }
+    const skip = parsePlayActivityRow(short, activityMap, new Map())
+    expect(skip?.skip).toBe(true)
+    expect(skip?.id.startsWith('csvs:')).toBe(true)
+
+    const paused = { ...short, 'End Reason Type': 'PLAYBACK_MANUALLY_PAUSED' }
+    expect(parsePlayActivityRow(paused, activityMap, new Map())).toBeNull()
+
+    // a full listen that ends with a skip near the end is still a play
+    const lateSkip = { ...activityRow, 'End Reason Type': 'TRACK_SKIPPED_FORWARDS' }
+    expect(parsePlayActivityRow(lateSkip, activityMap, new Map())?.skip).toBeUndefined()
+  })
+
+  it('daily rows emit skip events, including skip-only rows', () => {
+    const skipMap = { ...dailyMap, skipCount: 'Skip Count' }
+    const skipOnly = parseDailyTracksRow(
+      { ...dailyRow, 'Play Count': '0', 'Skip Count': '2' },
+      skipMap,
+      new Map(),
+      1,
+    )
+    expect(skipOnly).toHaveLength(2)
+    expect(skipOnly.every((r) => r.skip)).toBe(true)
+
+    const mixed = parseDailyTracksRow({ ...dailyRow, 'Skip Count': '1' }, skipMap, new Map(), 1)
+    expect(mixed.filter((r) => !r.skip)).toHaveLength(2)
+    expect(mixed.filter((r) => r.skip)).toHaveLength(1)
+  })
+
+  it('skip events are excluded from listening totals', () => {
+    const t = totals(
+      [play({ ms: 100 }), { ...play({ ms: 0 }), skip: true as const }],
+      noDur,
+    )
+    expect(t.plays).toBe(1)
+    expect(t.ms).toBe(100)
   })
 })
 
