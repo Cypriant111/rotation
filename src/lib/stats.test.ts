@@ -2,16 +2,26 @@ import { describe, expect, it } from 'vitest'
 import type { DurationMap, Play } from './types'
 import { DEFAULT_TRACK_MS, durationKey, resolvePlayMs } from './types'
 import {
+  dayKey,
   daySeries,
   hourMatrix,
   localDayStart,
   monthRange,
+  periodStart,
   streaks,
   topArtists,
   topTracks,
   totals,
 } from './stats'
-import { countsAsPlay, detectKind, buildArtistIndex, buildDedupeIndex, dedupeKey } from './csv'
+import {
+  buildArtistIndex,
+  buildDedupeIndex,
+  countsAsPlay,
+  dedupeKey,
+  detectKind,
+  parseDailyTracksRow,
+  parsePlayActivityRow,
+} from './csv'
 import { parseRecentTrack } from './lastfm'
 
 const noDur: DurationMap = new Map()
@@ -135,6 +145,28 @@ describe('localDayStart with offset', () => {
     const d = new Date(localDayStart(p))
     expect(d.getUTCDate()).toBe(16)
   })
+
+  it('offset and offset-less plays on the same local day share one day key', () => {
+    // a Last.fm play at browser-local Jul 15 10:00
+    const localTs = new Date(2026, 6, 15, 10, 0).getTime()
+    const lastfmPlay = play({ ts: localTs })
+    // a CSV play whose play-local calendar date is also Jul 15
+    const csvPlay = play({ ts: Date.UTC(2026, 6, 15, 10, 0), off: 0 })
+    expect(localDayStart(lastfmPlay)).toBe(Date.UTC(2026, 6, 15))
+    expect(localDayStart(csvPlay)).toBe(Date.UTC(2026, 6, 15))
+    expect(localDayStart(lastfmPlay)).toBe(dayKey(localTs))
+  })
+})
+
+describe('periodStart', () => {
+  it('aligns to local calendar days: a 7-day window is exactly 7 whole days', () => {
+    const now = new Date(2026, 6, 30, 15, 0).getTime()
+    const from = periodStart('7d', now)
+    expect(new Date(from).getHours()).toBe(0)
+    expect(new Date(from).getDate()).toBe(24) // 6 days before the 30th
+    const series = daySeries([], from, noDur, now)
+    expect(series).toHaveLength(7)
+  })
 })
 
 describe('streaks', () => {
@@ -191,6 +223,83 @@ describe('csv helpers', () => {
   it('artist index recovers titles', () => {
     const idx = buildArtistIndex([play({ artist: 'Radiohead', track: 'Weird Fishes' })])
     expect(idx.get('weird fishes')).toBe('Radiohead')
+  })
+})
+
+describe('csv row parsers', () => {
+  const dailyMap = {
+    trackDescription: 'Track Description',
+    datePlayed: 'Date Played',
+    hours: 'Hours',
+    playMs: 'Play Duration Milliseconds',
+    playCount: 'Play Count',
+  }
+  const dailyRow = {
+    'Track Description': 'Fontaines D.C. - Starburster',
+    'Date Played': '20260715',
+    Hours: '18, 19',
+    'Play Duration Milliseconds': '400000',
+    'Play Count': '2',
+  }
+
+  it('daily row expands to Play Count plays, splitting the row-total duration', () => {
+    const plays = parseDailyTracksRow(dailyRow, dailyMap, new Map(), 1)
+    expect(plays).toHaveLength(2)
+    expect(plays[0].artist).toBe('Fontaines D.C.')
+    expect(plays[0].track).toBe('Starburster')
+    expect(plays[0].ms + plays[1].ms).toBe(400_000)
+  })
+
+  it('skip-only rows (Play Count 0) produce no plays', () => {
+    expect(
+      parseDailyTracksRow({ ...dailyRow, 'Play Count': '0' }, dailyMap, new Map(), 1),
+    ).toHaveLength(0)
+  })
+
+  it('identical rollup rows get distinct ids via the row sequence', () => {
+    const a = parseDailyTracksRow(dailyRow, dailyMap, new Map(), 1)
+    const b = parseDailyTracksRow(dailyRow, dailyMap, new Map(), 2)
+    expect(a[0].id).not.toBe(b[0].id)
+  })
+
+  const activityMap = {
+    track: 'Song Name',
+    artist: 'Artist Name',
+    playMs: 'Play Duration Milliseconds',
+    mediaMs: 'Media Duration In Milliseconds',
+    eventStart: 'Event Start Timestamp',
+    eventType: 'Event Type',
+    utcOffsetS: 'UTC Offset In Seconds',
+  }
+  const activityRow = {
+    'Song Name': 'Romance',
+    'Artist Name': 'Fontaines D.C.',
+    'Play Duration Milliseconds': '210000',
+    'Media Duration In Milliseconds': '225000',
+    'Event Start Timestamp': '2026-07-15T18:30:00.000Z',
+    'Event Type': 'PLAY_END',
+    'UTC Offset In Seconds': '7200',
+  }
+
+  it('activity rows parse with the play-time offset in minutes', () => {
+    const p = parsePlayActivityRow(activityRow, activityMap, new Map())
+    expect(p?.off).toBe(120)
+    expect(p?.ms).toBe(210_000)
+  })
+
+  it('blank UTC offset stays unknown instead of becoming UTC', () => {
+    const p = parsePlayActivityRow(
+      { ...activityRow, 'UTC Offset In Seconds': '' },
+      activityMap,
+      new Map(),
+    )
+    expect(p?.off).toBeUndefined()
+  })
+
+  it('PLAY_START rows are not counted', () => {
+    expect(
+      parsePlayActivityRow({ ...activityRow, 'Event Type': 'PLAY_START' }, activityMap, new Map()),
+    ).toBeNull()
   })
 })
 

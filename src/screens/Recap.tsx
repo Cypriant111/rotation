@@ -76,7 +76,10 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
 
   async function openPreview(format: CardFormat) {
     const blob = blobs.current[format] ?? (await canvasToBlob(renderCard(cardData, format)))
-    setPreview({ url: URL.createObjectURL(blob), blob, format })
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url)
+      return { url: URL.createObjectURL(blob), blob, format }
+    })
   }
 
   async function doShare() {
@@ -193,12 +196,24 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
       </main>
       {preview && (
         <div className="modal-backdrop" onClick={closePreview}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Share your ${range.label} recap`}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') closePreview()
+            }}
+          >
             <div className="grabber" />
             <img className="card-preview" src={preview.url} alt={`${range.label} recap card`} />
             <div className="share-actions">
-              <button className="btn full" onClick={doShare}>
+              <button className="btn full" onClick={doShare} autoFocus>
                 Share
+              </button>
+              <button className="btn secondary" onClick={closePreview}>
+                Close
               </button>
             </div>
           </div>

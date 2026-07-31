@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "lint": "oxlint",
+    "icons": "node scripts/icons.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

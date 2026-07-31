@@ -19,11 +19,43 @@ function open(): Promise<IDBDatabase> {
         db.createObjectStore('kv')
       }
     }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-    req.onblocked = () => reject(new Error('IndexedDB open blocked'))
+    req.onsuccess = () => {
+      const db = req.result
+      // WebKit closes idle connections when iOS suspends the app; drop the
+      // cached handle so the next operation reopens instead of failing forever
+      db.onclose = () => {
+        dbPromise = null
+      }
+      db.onversionchange = () => {
+        db.close()
+        dbPromise = null
+      }
+      resolve(db)
+    }
+    req.onerror = () => {
+      dbPromise = null
+      reject(req.error)
+    }
+    req.onblocked = () => {
+      dbPromise = null
+      reject(new Error('IndexedDB open blocked'))
+    }
   })
   return dbPromise
+}
+
+/** Run an operation, reopening the database once if the connection died. */
+async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  try {
+    return await fn(await open())
+  } catch (e) {
+    const name = e instanceof DOMException ? e.name : ''
+    if (name === 'InvalidStateError' || name === 'TransactionInactiveError' || name === 'UnknownError') {
+      dbPromise = null
+      return fn(await open())
+    }
+    throw e
+  }
 }
 
 function txDone(tx: IDBTransaction): Promise<void> {
@@ -41,62 +73,68 @@ function reqResult<T>(req: IDBRequest<T>): Promise<T> {
   })
 }
 
-export async function putPlays(plays: Play[]): Promise<void> {
-  if (plays.length === 0) return
-  const db = await open()
-  // Chunked so one huge import doesn't hold a single transaction forever
-  const CHUNK = 4000
-  for (let i = 0; i < plays.length; i += CHUNK) {
-    const tx = db.transaction('plays', 'readwrite')
-    const store = tx.objectStore('plays')
-    for (const p of plays.slice(i, i + CHUNK)) store.put(p)
+export function putPlays(plays: Play[]): Promise<void> {
+  if (plays.length === 0) return Promise.resolve()
+  return withDb(async (db) => {
+    // Chunked so one huge import doesn't hold a single transaction forever
+    const CHUNK = 4000
+    for (let i = 0; i < plays.length; i += CHUNK) {
+      const tx = db.transaction('plays', 'readwrite')
+      const store = tx.objectStore('plays')
+      for (const p of plays.slice(i, i + CHUNK)) store.put(p)
+      await txDone(tx)
+    }
+  })
+}
+
+export function getAllPlays(): Promise<Play[]> {
+  return withDb((db) => {
+    const tx = db.transaction('plays', 'readonly')
+    return reqResult(tx.objectStore('plays').getAll() as IDBRequest<Play[]>)
+  })
+}
+
+export function countPlays(): Promise<number> {
+  return withDb((db) => {
+    const tx = db.transaction('plays', 'readonly')
+    return reqResult(tx.objectStore('plays').count())
+  })
+}
+
+export function clearPlays(source?: 'lastfm' | 'csv'): Promise<number> {
+  return withDb(async (db) => {
+    if (!source) {
+      const tx = db.transaction('plays', 'readwrite')
+      tx.objectStore('plays').clear()
+      await txDone(tx)
+      return 0
+    }
+    const all = await getAllPlays()
+    const doomed = all.filter((p) => p.source === source)
+    const CHUNK = 4000
+    for (let i = 0; i < doomed.length; i += CHUNK) {
+      const tx = db.transaction('plays', 'readwrite')
+      const store = tx.objectStore('plays')
+      for (const p of doomed.slice(i, i + CHUNK)) store.delete(p.id)
+      await txDone(tx)
+    }
+    return doomed.length
+  })
+}
+
+export function kvGet<T>(key: string): Promise<T | undefined> {
+  return withDb((db) => {
+    const tx = db.transaction('kv', 'readonly')
+    return reqResult(tx.objectStore('kv').get(key) as IDBRequest<T | undefined>)
+  })
+}
+
+export function kvSet(key: string, value: unknown): Promise<void> {
+  return withDb(async (db) => {
+    const tx = db.transaction('kv', 'readwrite')
+    tx.objectStore('kv').put(value, key)
     await txDone(tx)
-  }
-}
-
-export async function getAllPlays(): Promise<Play[]> {
-  const db = await open()
-  const tx = db.transaction('plays', 'readonly')
-  return reqResult(tx.objectStore('plays').getAll() as IDBRequest<Play[]>)
-}
-
-export async function countPlays(): Promise<number> {
-  const db = await open()
-  const tx = db.transaction('plays', 'readonly')
-  return reqResult(tx.objectStore('plays').count())
-}
-
-export async function clearPlays(source?: 'lastfm' | 'csv'): Promise<number> {
-  const db = await open()
-  if (!source) {
-    const tx = db.transaction('plays', 'readwrite')
-    tx.objectStore('plays').clear()
-    await txDone(tx)
-    return 0
-  }
-  const all = await getAllPlays()
-  const doomed = all.filter((p) => p.source === source)
-  const CHUNK = 4000
-  for (let i = 0; i < doomed.length; i += CHUNK) {
-    const tx = db.transaction('plays', 'readwrite')
-    const store = tx.objectStore('plays')
-    for (const p of doomed.slice(i, i + CHUNK)) store.delete(p.id)
-    await txDone(tx)
-  }
-  return doomed.length
-}
-
-export async function kvGet<T>(key: string): Promise<T | undefined> {
-  const db = await open()
-  const tx = db.transaction('kv', 'readonly')
-  return reqResult(tx.objectStore('kv').get(key) as IDBRequest<T | undefined>)
-}
-
-export async function kvSet(key: string, value: unknown): Promise<void> {
-  const db = await open()
-  const tx = db.transaction('kv', 'readwrite')
-  tx.objectStore('kv').put(value, key)
-  await txDone(tx)
+  })
 }
 
 /** Ask the browser not to evict our data under storage pressure. */

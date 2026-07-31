@@ -103,7 +103,7 @@ interface Row {
 // Apple Music predates 2015; anything older is iTunes-era noise
 const MIN_TS = Date.UTC(2013, 0, 1)
 
-function parsePlayActivityRow(
+export function parsePlayActivityRow(
   row: Row,
   m: Partial<Record<Field, string>>,
   knownArtists: Map<string, string>,
@@ -136,7 +136,9 @@ function parsePlayActivityRow(
   }
   if (!Number.isFinite(ts) || ts < MIN_TS) return null
 
-  const offS = Number(m.utcOffsetS ? row[m.utcOffsetS] : NaN)
+  // Number('') is 0, which would wrongly pin blank-offset rows to UTC
+  const offRaw = (m.utcOffsetS ? (row[m.utcOffsetS] ?? '') : '').trim()
+  const offS = offRaw === '' ? NaN : Number(offRaw)
   // Play Duration can exceed track length (repeats/stitched pauses); clamp
   const ms = Math.min(playMs, mediaMs > 0 ? mediaMs : playMs, 4 * 3_600_000)
 
@@ -152,10 +154,11 @@ function parsePlayActivityRow(
   }
 }
 
-function parseDailyTracksRow(
+export function parseDailyTracksRow(
   row: Row,
   m: Partial<Record<Field, string>>,
   knownArtists: Map<string, string>,
+  rowSeq: number,
 ): Play[] {
   if (m.mediaType && row[m.mediaType] && row[m.mediaType] !== 'AUDIO') return []
 
@@ -183,7 +186,10 @@ function parseDailyTracksRow(
     .filter((h) => Number.isInteger(h) && h >= 0 && h <= 23)
   if (hours.length === 0) hours.push(12)
 
-  const playCount = Math.max(1, Math.round(Number(m.playCount ? row[m.playCount] : 1)) || 1)
+  // skip-only rows carry Play Count 0 and must not fabricate a play
+  const pcRaw = m.playCount ? Number(row[m.playCount]) : NaN
+  if (Number.isFinite(pcRaw) && Math.round(pcRaw) <= 0) return []
+  const playCount = Number.isFinite(pcRaw) ? Math.max(1, Math.round(pcRaw)) : 1
   // Treated as the row total (SamTheGeek convention), split across plays
   const totalMs = Math.max(0, Number(m.playMs ? row[m.playMs] : 0) || 0)
   const perPlayMs = totalMs > 0 ? Math.min(totalMs / playCount, 4 * 3_600_000) : 0
@@ -194,7 +200,9 @@ function parseDailyTracksRow(
     const ts = new Date(y, mo - 1, d, hour, 0, 0, i).getTime()
     if (!Number.isFinite(ts)) continue
     plays.push({
-      id: `csv:${ts}:${hash(norm(artist) + ' ' + norm(track))}:${i}`,
+      // rowSeq keeps ids unique when the same track/day appears in several
+      // rollup rows (per end-reason/source buckets), and is stable per file
+      id: `csv:${ts}:${hash(norm(artist) + ' ' + norm(track))}:${rowSeq}:${i}`,
       ts,
       track,
       artist: artist || 'Unknown Artist',
@@ -245,12 +253,17 @@ export function parseAppleCsv(
     let lastTs: number | null = null
     let pending: Play[] = []
     let flushChain: Promise<void> = Promise.resolve()
+    let writeError: Error | null = null
 
     const flush = () => {
       if (pending.length === 0) return
       const batch = pending
       pending = []
-      flushChain = flushChain.then(() => onBatch(batch))
+      flushChain = flushChain.then(() => onBatch(batch)).catch((e) => {
+        // remember the storage failure so parsing stops instead of
+        // silently producing a partial import
+        if (!writeError) writeError = e instanceof Error ? e : new Error(String(e))
+      })
     }
 
     Papa.parse<Row>(file, {
@@ -258,6 +271,11 @@ export function parseAppleCsv(
       skipEmptyLines: true,
       chunk: (results, parser) => {
         try {
+          if (writeError) {
+            parser.abort()
+            reject(writeError)
+            return
+          }
           if (!headerMap) {
             const headers = results.meta.fields ?? []
             headerMap = buildHeaderMap(headers)
@@ -280,7 +298,7 @@ export function parseAppleCsv(
                     const p = parsePlayActivityRow(row, headerMap!, knownArtists)
                     return p ? [p] : []
                   })()
-                : parseDailyTracksRow(row, headerMap!, knownArtists)
+                : parseDailyTracksRow(row, headerMap!, knownArtists, rows)
             if (parsed.length === 0) {
               skipped++
               continue
@@ -306,7 +324,10 @@ export function parseAppleCsv(
       complete: () => {
         flush()
         flushChain
-          .then(() => resolve({ kind, imported, skipped, duplicates, firstTs, lastTs }))
+          .then(() => {
+            if (writeError) reject(writeError)
+            else resolve({ kind, imported, skipped, duplicates, firstTs, lastTs })
+          })
           .catch(reject)
       },
       error: (err) => reject(err),

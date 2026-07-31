@@ -8,7 +8,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': a forced auto-reload would abort in-flight CSV imports
+      // and Last.fm backfills; the app shows an update pill instead
+      registerType: 'prompt',
       includeAssets: ['icons/apple-touch-icon.png'],
       manifest: {
         name: 'Rotation',

@@ -31,6 +31,17 @@ export function Heatmap({ matrix }: Props) {
 
   const selected = sel ? matrix[sel[0]][sel[1]] : null
 
+  // nearest-cell tap layer: individual 12px cells are far below a usable
+  // touch target, so the whole grid resolves taps to the closest cell
+  const onTap = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const fx = ((e.clientX - rect.left) / rect.width) * W
+    const fy = ((e.clientY - rect.top) / rect.height) * H
+    const h = Math.min(23, Math.max(0, Math.floor((fx - LEFT) / (CELL + GAP))))
+    const d = Math.min(6, Math.max(0, Math.floor((fy - TOP) / (CELL + GAP))))
+    setSel(sel && sel[0] === d && sel[1] === h ? null : [d, h])
+  }
+
   return (
     <div className="chart-wrap">
       <div className="chart-tip" aria-live="polite">
@@ -48,7 +59,8 @@ export function Heatmap({ matrix }: Props) {
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', display: 'block' }}
         role="img"
-        aria-label="Listening by weekday and hour of day"
+        aria-label="Listening by weekday and hour of day; values in the table below"
+        onClick={onTap}
       >
         {matrix.map((row, d) =>
           row.map((v, h) => {
@@ -67,7 +79,6 @@ export function Heatmap({ matrix }: Props) {
                 fill={b === -1 ? 'var(--seg-bg)' : RAMP[b]}
                 stroke={isSel ? 'var(--ink)' : 'none'}
                 strokeWidth={isSel ? 1.5 : 0}
-                onPointerDown={() => setSel(isSel ? null : [d, h])}
               />
             )
           }),
@@ -103,6 +114,28 @@ export function Heatmap({ matrix }: Props) {
         ))}
         more
       </div>
+      {/* the WCAG-clean twin: every value reachable without the tooltip */}
+      <table className="sr-only">
+        <caption>Minutes listened by weekday and hour</caption>
+        <thead>
+          <tr>
+            <th scope="col">Day</th>
+            {Array.from({ length: 24 }, (_, h) => (
+              <th key={h} scope="col">{h}:00</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.map((row, d) => (
+            <tr key={d}>
+              <th scope="row">{DAY_NAMES[d]}</th>
+              {row.map((v, h) => (
+                <td key={h}>{fmtInt(msToMin(v))}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

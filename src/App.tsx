@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from './state/store'
+import { applyUpdate, onUpdateReady } from './lib/sw'
 import { Home } from './screens/Home'
 import { Top } from './screens/Top'
 import { Recap } from './screens/Recap'
@@ -31,9 +32,11 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home')
   const [toast, setToast] = useState('')
   const [showInstall, setShowInstall] = useState(false)
+  const [updateReady, setUpdateReady] = useState(false)
 
   useEffect(() => {
     setShowInstall(isIOS() && !isStandalone() && localStorage.getItem('installDismissed') !== '1')
+    onUpdateReady(() => setUpdateReady(true))
   }, [])
 
   useEffect(() => {
@@ -89,7 +92,16 @@ export default function App() {
           ))}
         </div>
       </nav>
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="toast" role="status" aria-live="polite">
+          {toast}
+        </div>
+      )}
+      {updateReady && (
+        <button className="update-pill" onClick={applyUpdate}>
+          Update ready — tap to reload
+        </button>
+      )}
     </div>
   )
 }

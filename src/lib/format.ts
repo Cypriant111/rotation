@@ -28,8 +28,24 @@ export function fmtDay(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function fmtDayFull(ts: number): string {
-  return new Date(ts).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+/* Day-key formatters: day keys are UTC midnights of local calendar dates,
+   so they must render in UTC or they shift a day in western timezones. */
+
+export function fmtDayKey(key: number): string {
+  return new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
+export function fmtDayKeyFull(key: number): string {
+  return new Date(key).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+export function weekdayNarrow(key: number): string {
+  return new Date(key).toLocaleDateString('en-US', { weekday: 'narrow', timeZone: 'UTC' })
 }
 
 export function fmtTime(ts: number): string {
