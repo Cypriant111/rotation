@@ -876,6 +876,14 @@ a.rank-row,
   margin-top: 10px;
 }
 
+.service-card .segmented {
+  margin-top: 10px;
+}
+
+.service-card .step-body {
+  margin-top: 8px;
+}
+
 /* ---------- about ---------- */
 .about p {
   font-size: 13.5px;

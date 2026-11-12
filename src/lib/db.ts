@@ -1,4 +1,4 @@
-import type { Play } from './types'
+import type { Play, Source } from './types'
 
 const DB_NAME = 'rotation'
 const DB_VERSION = 1
@@ -101,7 +101,7 @@ export function countPlays(): Promise<number> {
   })
 }
 
-export function clearPlays(source?: 'lastfm' | 'csv'): Promise<number> {
+export function clearPlays(source?: Source): Promise<number> {
   return withDb(async (db) => {
     if (!source) {
       const tx = db.transaction('plays', 'readwrite')

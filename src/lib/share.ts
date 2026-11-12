@@ -9,6 +9,8 @@ export interface CardData {
   streak: number
   /** 'day streak' for periods that include today, 'best run' for finished ones */
   streakLabel: string
+  /** "Apple Music" / "Spotify" for the footer */
+  serviceName: string
   topArtists: RankedItem[]
   topTracks: RankedItem[]
   estimated: boolean
@@ -180,7 +182,7 @@ export function renderCard(data: CardData, format: CardFormat): HTMLCanvasElemen
   // footer, pinned above the bottom safe zone
   ctx.fillStyle = INK_2
   ctx.font = FONT(400, 28)
-  const foot = data.estimated ? '* includes estimated durations' : 'from Apple Music listening'
+  const foot = data.estimated ? '* includes estimated durations' : `from ${data.serviceName} listening`
   ctx.fillText(foot, L.M, L.H - L.bottom)
 
   return canvas

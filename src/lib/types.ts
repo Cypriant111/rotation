@@ -21,11 +21,21 @@ export interface Play {
    * analytics and the completion factor in mix scoring.
    */
   skip?: true
-  source: 'lastfm' | 'csv'
+  /**
+   * The row came from a format that can't report skips (Spotify's yearly
+   * account-data file), even though its source usually can.
+   */
+  noSkipData?: true
+  source: Source
 }
 
+export type Source = 'lastfm' | 'csv' | 'spotify'
+
+/** The streaming service the user listens on; steers instructions and links. */
+export type Service = 'apple' | 'spotify'
+
 /** Sources whose rows say when a track was cut short. Last.fm never does. */
-export const SKIP_AWARE_SOURCES: ReadonlySet<Play['source']> = new Set<Play['source']>(['csv'])
+export const SKIP_AWARE_SOURCES: ReadonlySet<Source> = new Set<Source>(['csv', 'spotify'])
 
 export interface Settings {
   lastfmUser: string
@@ -41,6 +51,8 @@ export interface Settings {
    */
   backfillOldestUts: number
   autoSync: boolean
+  /** chosen on first run or in Settings; '' = not chosen yet (texts fall back to Apple Music) */
+  service: Service | ''
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,7 +62,14 @@ export const DEFAULT_SETTINGS: Settings = {
   backfillDone: false,
   backfillOldestUts: 0,
   autoSync: true,
+  service: '',
 }
+
+export function serviceOf(s: Pick<Settings, 'service'>): Service {
+  return s.service || 'apple'
+}
+
+export const SERVICE_NAME: Record<Service, string> = { apple: 'Apple Music', spotify: 'Spotify' }
 
 /** artist + NUL + track -> full track length in ms (from Last.fm metadata) */
 export type DurationMap = Map<string, number>

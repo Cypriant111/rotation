@@ -1,9 +1,10 @@
 # Rotation
 
-Your Apple Music listening stats, on your iPhone home screen.
+Your music listening stats, on your phone's home screen. Works with Apple Music
+and Spotify, on iPhone and Android.
 
-Rotation is a small installable web app (PWA) that tracks what you listen to on
-Apple Music and turns it into stats: minutes listened, plays, top artists /
+Rotation is a small installable web app (PWA) that tracks what you listen to and
+turns it into stats: minutes listened, plays, top artists /
 songs / albums, a listening-clock heatmap, streaks, skip analytics, and
 shareable recap cards. Everything is stored on your device - there is no
 backend and no account.
@@ -13,9 +14,10 @@ actually like: *Heavy Rotation* (recency-weighted plays, corrected by how often
 you finish the song and how many separate days you reached for it), *On the
 Rise* (surging against your own baseline), *Old Flames* (heavily played, gone
 quiet for 60+ days), and *No Skips* (never once cut short - counted only from
-sources that report skips, i.e. the Apple CSV import; Last.fm doesn't). Each mix can be copied or shared as
-"Artist - Song" lines (playlist-importer Shortcuts read that format), and each
-row opens the song in Apple Music.
+sources that report skips, i.e. the Apple and Spotify exports; Last.fm
+doesn't). Each mix can be copied or shared as "Artist - Song" lines
+(playlist importers read that format), and each row opens the song in Apple
+Music or Spotify, whichever you picked.
 
 <p>
   <img src="docs/screenshots/home.png" width="190" alt="Home: minutes, plays and artists for the last 7 days, with a daily bar chart">
@@ -35,14 +37,18 @@ away. Nothing is saved; **Exit demo** in the red bar takes you back.
 
 ## How it gets your listening data
 
-Apple doesn't offer a listening-history API, so Rotation combines two sources:
+Rotation never signs in to Apple or Spotify. It combines two sources:
 
-1. **Last.fm (automatic, ongoing).** The free Last.fm iPhone app records
-   ("scrobbles") your Apple Music plays; Rotation pulls them from the Last.fm
-   API every time you open it.
-2. **Apple privacy export (deep history).** Apple will send you CSVs of your
-   full play history since ~2015; Rotation imports them locally and merges
-   them with the Last.fm data (duplicates are detected and skipped).
+1. **Last.fm (automatic, ongoing).** Last.fm records ("scrobbles") your plays:
+   for Apple Music through the free Last.fm iPhone app, for Spotify through
+   Spotify's own Last.fm connection. Rotation pulls them from the Last.fm API
+   every time you open it.
+2. **Privacy export (deep history).** Apple and Spotify will both send you your
+   full play history on request; Rotation imports it locally and merges it
+   with the Last.fm data (duplicates are detected and skipped).
+
+Pick your service on the first screen (or later in Settings); it decides which
+instructions you see and where song links open.
 
 ## Install on your phone
 
@@ -59,7 +65,17 @@ Apple doesn't offer a listening-history API, so Rotation combines two sources:
 
 ## Set up automatic tracking (Last.fm)
 
-One-time, roughly five minutes:
+**Spotify** (a few minutes, no extra app):
+
+1. Create a free account at [last.fm/join](https://www.last.fm/join).
+2. On last.fm open [Settings ▸ Applications](https://www.last.fm/settings/applications)
+   and connect **Spotify Scrobbling**. Spotify now reports every play, from
+   every device.
+3. Get an API key at
+   [last.fm/api/account/create](https://www.last.fm/api/account/create) (any
+   application name) and enter it with your username in Rotation's Settings.
+
+**Apple Music**, one-time, roughly five minutes:
 
 1. Create a free account at [last.fm/join](https://www.last.fm/join).
 2. Install the **Last.fm** app from the App Store and sign in.
@@ -90,6 +106,19 @@ scrobbles in real time because it *is* the player.)
 
 The file is parsed entirely on your device and never uploaded.
 
+## Import your full Spotify history
+
+1. On [spotify.com/account/privacy](https://www.spotify.com/account/privacy/)
+   tick **Extended streaming history** and request your data.
+2. Spotify emails a download link, usually within days (at most 30).
+3. Unzip it and select all the `Streaming_History_Audio_*.json` files at once in
+   Rotation's Settings tab (with Spotify chosen as your service). Podcasts,
+   audiobooks and video are left out; a stream counts as a play from 30
+   seconds, and shorter ones you skipped feed the skip stats.
+
+The one-year `StreamingHistory_music_*.json` files from Spotify's quicker
+"Account data" download work too, but they carry no skip information.
+
 ## Development
 
 ```bash
@@ -115,7 +144,8 @@ change `base` in `vite.config.ts` and the icon/start_url paths in
 
 - All listening data lives in IndexedDB on your device.
 - The only network calls are to the Last.fm API (your scrobbles, with your own
-  API key) and Last.fm's image CDN for album artwork.
+  API key) and Last.fm's image CDN for album artwork. No Apple or Spotify
+  login, no Spotify Web API.
 - Settings ▸ Data lets you export everything as JSON or delete it per source.
 
-Rotation is not affiliated with Apple or Last.fm.
+Rotation is not affiliated with Apple, Spotify or Last.fm.

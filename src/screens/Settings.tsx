@@ -2,6 +2,10 @@ import { useMemo, useRef, useState } from 'react'
 import { useApp } from '../state/store'
 import { fmtAgo, fmtInt } from '../lib/format'
 import type { ImportResult } from '../lib/csv'
+import type { SpotifyImportResult } from '../lib/spotify'
+import type { Source } from '../lib/types'
+import { serviceOf } from '../lib/types'
+import { ServicePicker } from '../components/ServicePicker'
 import { useInstall } from '../lib/install'
 
 /** Daily Tracks is a few MB even for a decade of listening; Play Activity runs to hundreds. */
@@ -20,21 +24,20 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importError, setImportError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const spotifyRef = useRef<HTMLInputElement>(null)
+  const [spotifyProgress, setSpotifyProgress] = useState<{ read: number; of: number } | null>(null)
+  const [spotifyResult, setSpotifyResult] = useState<SpotifyImportResult | null>(null)
+  const [spotifyError, setSpotifyError] = useState('')
+  const service = serviceOf(settings)
   const isIOS = useInstall().platform === 'ios'
 
   const counts = useMemo(() => {
-    let lastfm = 0
-    let csv = 0
-    let skips = 0
+    const c = { lastfm: 0, csv: 0, spotify: 0, skips: 0 }
     for (const p of plays) {
-      if (p.skip) {
-        skips++
-        continue
-      }
-      if (p.source === 'lastfm') lastfm++
-      else csv++
+      if (p.skip) c.skips++
+      else c[p.source]++
     }
-    return { lastfm, csv, skips }
+    return c
   }, [plays])
 
   const connected = Boolean(settings.lastfmUser)
@@ -83,6 +86,24 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
     }
   }
 
+  async function onSpotifyFiles(list: FileList | null) {
+    const files = list ? [...list] : []
+    if (files.length === 0) return
+    setSpotifyError('')
+    setSpotifyResult(null)
+    setSpotifyProgress({ read: 0, of: files.length })
+    try {
+      const result = await app.importSpotify(files, (read) => setSpotifyProgress({ read, of: files.length }))
+      setSpotifyResult(result)
+      showToast(`Imported ${fmtInt(result.imported)} plays`)
+    } catch (e) {
+      setSpotifyError((e as Error).message)
+    } finally {
+      setSpotifyProgress(null)
+      if (spotifyRef.current) spotifyRef.current.value = ''
+    }
+  }
+
   function exportJson() {
     const blob = new Blob([JSON.stringify(plays)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -95,9 +116,9 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
     setTimeout(() => URL.revokeObjectURL(url), 30_000)
   }
 
-  async function clearSource(source: 'lastfm' | 'csv') {
-    const n = source === 'lastfm' ? counts.lastfm : counts.csv
-    if (!window.confirm(`Delete ${fmtInt(n)} ${source === 'lastfm' ? 'Last.fm' : 'imported CSV'} plays from this device?`)) return
+  async function clearSource(source: Source) {
+    const label = { lastfm: 'Last.fm', csv: 'imported Apple Music', spotify: 'imported Spotify' }[source]
+    if (!window.confirm(`Delete ${fmtInt(counts[source])} ${label} plays from this device?`)) return
     await app.clearSource(source)
     showToast('Deleted')
   }
@@ -108,6 +129,15 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
         <h1>Settings</h1>
       </header>
       <main>
+        <div className="section-label">Your music service</div>
+        <div className="card">
+          <ServicePicker />
+          <div className="note">
+            Steers the setup steps below, where song links in Mixes open, and the footer on recap
+            cards.
+          </div>
+        </div>
+
         <div className="section-label">Last.fm — automatic tracking</div>
         <div className="card">
           {!connected ? (
@@ -135,6 +165,32 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
                   {connecting ? 'Checking…' : 'Connect'}
                 </button>
               </div>
+              {service === 'spotify' ? (
+              <div className="note">
+                One-time setup, a few minutes:
+                <ol>
+                  <li>
+                    Create a free account at <a href="https://www.last.fm/join" target="_blank" rel="noreferrer">last.fm/join</a>.
+                  </li>
+                  <li>
+                    On last.fm open{' '}
+                    <a href="https://www.last.fm/settings/applications" target="_blank" rel="noreferrer">
+                      Settings ▸ Applications
+                    </a>{' '}
+                    and connect <strong>Spotify Scrobbling</strong>. Spotify then reports every play itself,
+                    from all your devices; the Last.fm phone app isn’t needed.
+                  </li>
+                  <li>
+                    While signed in, open{' '}
+                    <a href="https://www.last.fm/api/account/create" target="_blank" rel="noreferrer">
+                      last.fm/api/account/create
+                    </a>
+                    , enter any app name (say, Rotation), submit, and copy the <strong>API key</strong> here.
+                    Keys are free and instant — the shared secret is not needed.
+                  </li>
+                </ol>
+              </div>
+              ) : (
               <div className="note">
                 One-time setup, about five minutes:
                 <ol>
@@ -158,6 +214,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
                 Open the Last.fm app every day or two; iOS only lets it read your play history while it
                 runs. Every play it records shows up here on the next sync.
               </div>
+              )}
             </>
           ) : (
             <>
@@ -210,6 +267,73 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           )}
         </div>
 
+        {service === 'spotify' && (
+          <>
+            <div className="section-label">Spotify export — full history</div>
+            <div className="card">
+              <input
+                ref={spotifyRef}
+                type="file"
+                multiple
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={(e) => onSpotifyFiles(e.target.files)}
+              />
+              <button
+                className="btn secondary full"
+                onClick={() => spotifyRef.current?.click()}
+                disabled={app.importing}
+              >
+                {app.importing ? 'Importing…' : 'Import JSON files'}
+              </button>
+              {spotifyProgress && (
+                <div className="progress-line">
+                  <span className="spin" />
+                  reading file {fmtInt(spotifyProgress.read)} of {fmtInt(spotifyProgress.of)}
+                </div>
+              )}
+              {spotifyError && <div className="inline-error">{spotifyError}</div>}
+              {spotifyResult && (
+                <div className="inline-ok">
+                  Imported {fmtInt(spotifyResult.imported)} plays
+                  {spotifyResult.skipEvents > 0 ? ` and ${fmtInt(spotifyResult.skipEvents)} skips` : ''} from{' '}
+                  {fmtInt(spotifyResult.files)} {spotifyResult.files === 1 ? 'file' : 'files'}
+                  {spotifyResult.duplicates > 0 ? `, skipped ${fmtInt(spotifyResult.duplicates)} already tracked` : ''}
+                  {spotifyResult.firstTs
+                    ? ` (${new Date(spotifyResult.firstTs).getFullYear()}–${new Date(spotifyResult.lastTs!).getFullYear()})`
+                    : ''}
+                  .
+                  {spotifyResult.kinds.length === 1 && spotifyResult.kinds[0] === 'account'
+                    ? ' This is the one-year account data file, which has no skip information; the extended history gives you everything.'
+                    : ''}
+                </div>
+              )}
+              <div className="note">
+                Spotify will send you your full listening history:
+                <ol>
+                  <li>
+                    On{' '}
+                    <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noreferrer">
+                      spotify.com/account/privacy
+                    </a>{' '}
+                    tick <strong>Extended streaming history</strong> and request the data.
+                  </li>
+                  <li>Spotify emails a download link, usually within a few days and at most 30.</li>
+                  <li>
+                    Unzip the download (on iPhone, tap it in the Files app), then select all the{' '}
+                    <strong>Streaming_History_Audio</strong> files here at once. Podcasts and videos are
+                    left out. The one-year <strong>StreamingHistory_music</strong> files from “Account
+                    data” work too, without skips.
+                  </li>
+                </ol>
+                Everything stays on this device — the files are never uploaded anywhere.
+              </div>
+            </div>
+          </>
+        )}
+
+        {service === 'apple' && (
+          <>
         <div className="section-label">Apple Music export — full history</div>
         <div className="card">
           <input
@@ -260,6 +384,8 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
             Everything stays on this device — the file is never uploaded anywhere.
           </div>
         </div>
+          </>
+        )}
 
         <div className="section-label">Data</div>
         <div className="card">
@@ -267,8 +393,9 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
             <div className="settings-main">
               All plays
               <div className="hint">
-                {fmtInt(counts.lastfm + counts.csv)} plays · {fmtInt(counts.lastfm)} Last.fm ·{' '}
-                {fmtInt(counts.csv)} imported
+                {fmtInt(counts.lastfm + counts.csv + counts.spotify)} plays · {fmtInt(counts.lastfm)} Last.fm
+                {counts.csv > 0 || service === 'apple' ? ` · ${fmtInt(counts.csv)} Apple Music` : ''}
+                {counts.spotify > 0 || service === 'spotify' ? ` · ${fmtInt(counts.spotify)} Spotify` : ''}
                 {counts.skips > 0 ? ` · ${fmtInt(counts.skips)} skips` : ''}
               </div>
             </div>
@@ -279,7 +406,14 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           {counts.csv > 0 && (
             <div className="settings-row">
               <button style={{ color: 'var(--danger)' }} onClick={() => clearSource('csv')}>
-                Delete imported CSV plays
+                Delete imported Apple Music plays
+              </button>
+            </div>
+          )}
+          {counts.spotify > 0 && (
+            <div className="settings-row">
+              <button style={{ color: 'var(--danger)' }} onClick={() => clearSource('spotify')}>
+                Delete imported Spotify plays
               </button>
             </div>
           )}
@@ -311,7 +445,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
             your scrobbles with your own key, and Last.fm’s image server (lastfm.freetls.fastly.net)
             for album artwork. The app itself loads from GitHub Pages.
           </p>
-          <p>Rotation is not affiliated with Apple or Last.fm.</p>
+          <p>Rotation is not affiliated with Apple, Spotify or Last.fm.</p>
           <p>
             Open source:{' '}
             <a href="https://github.com/Cypriant111/rotation" target="_blank" rel="noreferrer">

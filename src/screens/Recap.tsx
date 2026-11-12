@@ -17,6 +17,7 @@ import { Heatmap } from '../components/Heatmap'
 import { Chips } from '../components/Segmented'
 import { canvasToBlob, renderCard, shareCard } from '../lib/share'
 import { useFadeOnChange, usePresence } from '../lib/motion'
+import { SERVICE_NAME, serviceOf } from '../lib/types'
 import type { CardData, CardFormat } from '../lib/share'
 
 type RecapPeriod = 'this-month' | 'last-month' | 'this-year' | 'all'
@@ -29,7 +30,8 @@ function rangeFor(p: RecapPeriod): { from: number; to: number; label: string } {
 }
 
 export function Recap({ showToast }: { showToast: (msg: string) => void }) {
-  const { plays, durations, artists: ak } = useApp()
+  const { plays, durations, artists: ak, settings } = useApp()
+  const serviceName = SERVICE_NAME[serviceOf(settings)]
   const [period, setPeriod] = useState<RecapPeriod>('this-month')
   const [preview, setPreview] = useState<{ url: string; blob: Blob; format: CardFormat } | null>(null)
   // the sheet stays mounted through its exit; `preview` is kept until then
@@ -61,11 +63,12 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
       artists: t.artists,
       streak: ps.value,
       streakLabel: ps.label,
+      serviceName,
       topArtists: artists,
       topTracks: tracks,
       estimated: t.estimated,
     }),
-    [range, t, ps, artists, tracks],
+    [range, t, ps, artists, tracks, serviceName],
   )
 
   // pre-render cards so the share tap stays inside iOS's user-gesture window

@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: {
         name: 'Rotation',
         short_name: 'Rotation',
-        description: 'Your Apple Music listening stats',
+        description: 'Your music listening stats, for Apple Music and Spotify',
         start_url: '/rotation/',
         scope: '/rotation/',
         display: 'standalone',

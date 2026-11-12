@@ -1,4 +1,4 @@
-import type { DurationMap, Play } from './types'
+import type { DurationMap, Play, Service } from './types'
 import { SKIP_AWARE_SOURCES, norm, resolvePlayMs } from './types'
 import { localDayStart } from './stats'
 import type { ArtistKeyer } from './artists'
@@ -79,7 +79,7 @@ export function aggregateTracks(
       continue
     }
     a.plays++
-    if (SKIP_AWARE_SOURCES.has(p.source)) a.skipAwarePlays++
+    if (SKIP_AWARE_SOURCES.has(p.source) && !p.noSkipData) a.skipAwarePlays++
     a.ms += resolvePlayMs(p, durations)
     if (p.ts < a.firstTs) a.firstTs = p.ts
     if (p.ts > a.lastTs) a.lastTs = p.ts
@@ -229,4 +229,12 @@ export function mixToText(mix: Mix): string {
 
 export function appleMusicSearchUrl(t: Pick<MixTrack, 'name' | 'artist'>): string {
   return `https://music.apple.com/search?term=${encodeURIComponent(`${t.artist} ${t.name}`)}`
+}
+
+export function spotifySearchUrl(t: Pick<MixTrack, 'name' | 'artist'>): string {
+  return `https://open.spotify.com/search/${encodeURIComponent(`${t.artist} ${t.name}`)}`
+}
+
+export function searchUrl(service: Service, t: Pick<MixTrack, 'name' | 'artist'>): string {
+  return service === 'spotify' ? spotifySearchUrl(t) : appleMusicSearchUrl(t)
 }

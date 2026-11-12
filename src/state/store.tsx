@@ -5,7 +5,8 @@ import { clearPlays, getAllPlays, kvGet, kvSet, putPlays, requestPersistence } f
 import { buildArtistIndex, buildDedupeIndex, dedupeKey, parseAppleCsv } from '../lib/csv'
 import type { ImportResult } from '../lib/csv'
 import { fetchAlbumArt, fetchDurations, fetchScrobbles, getUserInfo } from '../lib/lastfm'
-import type { DurationMap, Play, Settings } from '../lib/types'
+import type { DurationMap, Play, Settings, Source } from '../lib/types'
+import type { SpotifyImportResult } from '../lib/spotify'
 import { DEFAULT_SETTINGS } from '../lib/types'
 import type { ArtistKeyer } from '../lib/artists'
 import { makeArtistKeyer } from '../lib/artists'
@@ -47,7 +48,8 @@ interface AppState {
   disconnect: () => Promise<void>
   syncNow: () => Promise<void>
   importCsv: (file: File, onProgress?: (rows: number, kept: number) => void) => Promise<ImportResult>
-  clearSource: (source: 'lastfm' | 'csv') => Promise<void>
+  importSpotify: (files: File[], onProgress?: (filesRead: number) => void) => Promise<SpotifyImportResult>
+  clearSource: (source: Source) => Promise<void>
   saveSettings: (patch: Partial<Settings>) => Promise<void>
 }
 
@@ -187,12 +189,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // a play already imported from an Apple CSV must not count twice
-        const csvPlays = playsRef.current.filter((p) => p.source === 'csv')
-        if (csvPlays.length > 0) {
+        // a play already imported from an Apple CSV or a Spotify export must not count twice
+        const exportPlays = playsRef.current.filter((p) => p.source !== 'lastfm')
+        if (exportPlays.length > 0) {
           const ak = makeArtistKeyer([...playsRef.current, ...incoming]).key
-          const csvIndex = buildDedupeIndex(csvPlays, ak)
-          incoming = incoming.filter((p) => !csvIndex.has(dedupeKey(p.artist, p.track, p.ts, ak)))
+          const exportIndex = buildDedupeIndex(exportPlays, ak)
+          incoming = incoming.filter((p) => !exportIndex.has(dedupeKey(p.artist, p.track, p.ts, ak)))
         }
 
         if (gen !== syncGen.current) return // disconnected mid-sync; discard
@@ -291,8 +293,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [mergePlays],
   )
 
+  const importSpotify = useCallback(
+    async (files: File[], onProgress?: (filesRead: number) => void) => {
+      setImporting(true)
+      setDemoPlays(null)
+      try {
+        const arrays: { name: string; data: unknown }[] = []
+        for (const f of files) {
+          let data: unknown
+          try {
+            data = JSON.parse(await f.text())
+          } catch {
+            throw new Error(`${f.name} is not a JSON file from the Spotify export.`)
+          }
+          arrays.push({ name: f.name, data })
+          onProgress?.(arrays.length)
+        }
+        const ak = makeArtistKeyer(playsRef.current).key
+        const index = buildDedupeIndex(playsRef.current, ak)
+        const { parseSpotifyFiles } = await import('../lib/spotify')
+        const { plays: parsed, result } = parseSpotifyFiles(arrays, index, ak)
+        await putPlays(parsed)
+        mergePlays(parsed)
+        return result
+      } finally {
+        setImporting(false)
+      }
+    },
+    [mergePlays],
+  )
+
   const clearSource = useCallback(
-    async (source: 'lastfm' | 'csv') => {
+    async (source: Source) => {
       if (source === 'lastfm') {
         syncGen.current++
         setSync({ state: 'idle', lastSyncAt: null })
@@ -354,10 +386,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       disconnect,
       syncNow: () => runSync(),
       importCsv,
+      importSpotify,
       clearSource,
       saveSettings,
     }),
-    [ready, shownPlays, plays, demoPlays, startDemo, exitDemo, settings, shownArt, artists, artFor, durations, sync, importing, connect, disconnect, runSync, importCsv, clearSource, saveSettings],
+    [ready, shownPlays, plays, demoPlays, startDemo, exitDemo, settings, shownArt, artists, artFor, durations, sync, importing, connect, disconnect, runSync, importCsv, importSpotify, clearSource, saveSettings],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

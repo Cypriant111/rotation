@@ -4,6 +4,8 @@ import { useApp } from '../state/store'
 import { promptInstall, useInstall } from '../lib/install'
 import type { InstallState } from '../lib/install'
 import { Mark } from './Icons'
+import { ServicePicker } from './ServicePicker'
+import type { Service } from '../lib/types'
 
 interface Step {
   key: string
@@ -66,37 +68,65 @@ function installStep(install: InstallState, onPrompt: () => void): Step {
  * the three steps to real stats. Steps are plain data so more sources
  * (e.g. a streaming-service choice) can slot in without a rewrite.
  */
+function historyStep(service: Service): Step {
+  if (service === 'spotify') {
+    return {
+      key: 'history',
+      title: 'Ask Spotify for your history, today',
+      body: (
+        <>
+          On{' '}
+          <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noreferrer">
+            spotify.com/account/privacy
+          </a>{' '}
+          tick <strong>Extended streaming history</strong> and request it. Spotify can take up to 30
+          days, so start now. When the email arrives, import the files in Settings.
+        </>
+      ),
+    }
+  }
+  return {
+    key: 'history',
+    title: 'Ask Apple for your history, today',
+    body: (
+      <>
+        Apple takes up to 7 days to prepare it, so start now: on{' '}
+        <a href="https://privacy.apple.com" target="_blank" rel="noreferrer">
+          privacy.apple.com
+        </a>{' '}
+        choose <strong>Get a copy of your data</strong> ▸ <strong>Apple Media Services information</strong>.
+        When the email arrives, import the file in Settings.
+      </>
+    ),
+  }
+}
+
 export function FirstRun({ goToSettings }: { goToSettings: () => void }) {
-  const { startDemo } = useApp()
+  const { startDemo, settings } = useApp()
   const install = useInstall()
   const [loading, setLoading] = useState(false)
+  const service = settings.service
 
   const steps: Step[] = [
     installStep(install, () => void promptInstall()),
-    {
-      key: 'apple',
-      title: 'Ask Apple for your history, today',
-      body: (
-        <>
-          Apple takes up to 7 days to prepare it, so start now: on{' '}
-          <a href="https://privacy.apple.com" target="_blank" rel="noreferrer">
-            privacy.apple.com
-          </a>{' '}
-          choose <strong>Get a copy of your data</strong> ▸ <strong>Apple Media Services information</strong>.
-          When the email arrives, import the file in Settings.
-        </>
-      ),
-    },
-    {
-      key: 'lastfm',
-      title: 'Connect Last.fm',
-      body: 'Free, about five minutes. From then on new plays show up on their own.',
-      action: (
-        <button className="btn secondary" onClick={goToSettings}>
-          Set up in Settings
-        </button>
-      ),
-    },
+    ...(service
+      ? [
+          historyStep(service),
+          {
+            key: 'lastfm',
+            title: 'Connect Last.fm',
+            body:
+              service === 'spotify'
+                ? 'Free, a few minutes: link Spotify to Last.fm once, and new plays show up here on their own.'
+                : 'Free, about five minutes. From then on new plays show up on their own.',
+            action: (
+              <button className="btn secondary" onClick={goToSettings}>
+                Set up in Settings
+              </button>
+            ),
+          },
+        ]
+      : []),
   ]
 
   async function demo() {
@@ -112,10 +142,10 @@ export function FirstRun({ goToSettings }: { goToSettings: () => void }) {
     <div className="first-run">
       <div className="first-run-hero">
         <Mark size={56} />
-        <h2>Your Apple Music listening, in numbers</h2>
+        <h2>Your listening, in numbers</h2>
         <p>
           Minutes, top artists and songs, mixes of what you really like, and recap cards to share.
-          Everything stays on this device.
+          For Apple Music and Spotify. Everything stays on this device.
         </p>
         <button className="btn" onClick={demo} disabled={loading}>
           {loading ? 'Loading…' : 'See it with sample data'}
@@ -123,6 +153,11 @@ export function FirstRun({ goToSettings }: { goToSettings: () => void }) {
       </div>
 
       <div className="section-label">Get your own stats in 3 steps</div>
+      <div className="card service-card">
+        <div className="step-title">What do you listen on?</div>
+        <ServicePicker />
+        {!service && <div className="step-body">Pick one to see the steps for it. You can change it in Settings.</div>}
+      </div>
       <ol className="steps">
         {steps.map((s, i) => (
           <li className={`card step${s.done ? ' done' : ''}`} key={s.key}>
