@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { pulse, useGrowOnShow } from '../lib/motion'
+import { IconCheck } from '../components/Icons'
 import { useApp } from '../state/store'
 import { appleMusicSearchUrl, buildMixes, mixToText } from '../lib/affinity'
 import type { Mix } from '../lib/affinity'
@@ -12,6 +14,11 @@ const PREVIEW_ROWS = 6
 function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => void }) {
   const { artFor } = useApp()
   const [expanded, setExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef(0)
+  const copyBtn = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  useGrowOnShow(listRef, '.row-bar', mix.key, 'scaleX(0)')
   const rows = expanded ? mix.tracks : mix.tracks.slice(0, PREVIEW_ROWS)
   // rows are ordered by score, so the bar shows score too (count stays as text)
   const maxScore = mix.tracks[0]?.score || 1
@@ -19,7 +26,10 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
   async function copy() {
     try {
       await navigator.clipboard.writeText(mixToText(mix))
-      showToast(`Copied ${mix.tracks.length} songs`)
+      setCopied(true)
+      pulse(copyBtn.current)
+      clearTimeout(copiedTimer.current)
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 1500)
     } catch {
       showToast('Copy failed')
     }
@@ -46,7 +56,7 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
           <div className="mix-blurb">{mix.blurb}</div>
         </div>
       </div>
-      <div className="rank-list">
+      <div className="rank-list" ref={listRef}>
         {rows.map((t, i) => (
           <a
             className="rank-row"
@@ -78,8 +88,15 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
         </button>
       )}
       <div className="share-actions">
-        <button className="btn secondary" onClick={copy}>
-          Copy list
+        <button className="btn secondary copy-btn" onClick={copy} ref={copyBtn} aria-live="polite">
+          {copied ? (
+            <>
+              <IconCheck size={17} />
+              Copied
+            </>
+          ) : (
+            'Copy list'
+          )}
         </button>
         <button className="btn secondary" onClick={share}>
           Share

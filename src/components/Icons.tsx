@@ -71,3 +71,11 @@ export function Mark({ size = 56 }: IconProps) {
     </svg>
   )
 }
+
+export function IconCheck({ size = 18 }: IconProps) {
+  return (
+    <svg {...base(size)} strokeWidth={2.4} aria-hidden>
+      <path d="M5 12.5 10 17.5 19 7" />
+    </svg>
+  )
+}

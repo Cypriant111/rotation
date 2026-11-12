@@ -3,19 +3,25 @@ import { fmtInt } from '../lib/format'
 import { useApp } from '../state/store'
 import { Artwork } from './Artwork'
 import { RowBar } from './RowBar'
+import { useRef } from 'react'
+import { useGrowOnShow } from '../lib/motion'
 
 interface Props {
   items: RankedItem[]
   kind: 'artist' | 'track' | 'album'
+  /** bars grow from zero when this changes (and on first show) */
+  animateKey?: unknown
 }
 
-export function RankList({ items, kind }: Props) {
+export function RankList({ items, kind, animateKey }: Props) {
   const { artFor } = useApp()
+  const ref = useRef<HTMLDivElement>(null)
+  useGrowOnShow(ref, '.row-bar', animateKey, 'scaleX(0)')
   if (items.length === 0) return null
   const max = items[0].plays
 
   return (
-    <div className="rank-list">
+    <div className="rank-list" ref={ref}>
       {items.map((item, i) => (
         <div className="rank-row" key={`${item.name}|${item.sub}`}>
           <div className="row-body">

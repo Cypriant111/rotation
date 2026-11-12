@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useFadeOnChange } from '../lib/motion'
 import { useApp } from '../state/store'
 import type { PeriodKey } from '../lib/stats'
 import { PERIODS, periodStart, playsIn, topAlbums, topArtists, topTracks } from '../lib/stats'
@@ -11,6 +12,8 @@ export function Top() {
   const { plays, durations, artists } = useApp()
   const [kind, setKind] = useState<Kind>('artists')
   const [period, setPeriod] = useState<PeriodKey>('30d')
+  const listRef = useRef<HTMLDivElement>(null)
+  useFadeOnChange(listRef, `${kind}|${period}`)
 
   const periodPlays = useMemo(() => playsIn(plays, periodStart(period)), [plays, period])
 
@@ -40,18 +43,21 @@ export function Top() {
           value={period}
           onChange={setPeriod}
         />
-        {items.length === 0 ? (
-          <div className="empty">
-            <p>Nothing in this period yet.</p>
-          </div>
-        ) : (
-          <div className="card">
-            <RankList
-              items={items}
-              kind={kind === 'artists' ? 'artist' : kind === 'tracks' ? 'track' : 'album'}
-            />
-          </div>
-        )}
+        <div ref={listRef}>
+          {items.length === 0 ? (
+            <div className="empty">
+              <p>Nothing in this period yet.</p>
+            </div>
+          ) : (
+            <div className="card">
+              <RankList
+                items={items}
+                kind={kind === 'artists' ? 'artist' : kind === 'tracks' ? 'track' : 'album'}
+                animateKey={`${kind}|${period}`}
+              />
+            </div>
+          )}
+        </div>
       </main>
     </>
   )

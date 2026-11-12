@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useFadeOnChange } from '../lib/motion'
 import { useApp } from '../state/store'
 import { daySeries, periodStart, playsIn, totals } from '../lib/stats'
 import { fmtAgo, fmtInt, msToMin } from '../lib/format'
@@ -12,6 +13,8 @@ type HomePeriod = '7d' | '30d'
 export function Home({ goToSettings }: { goToSettings: () => void }) {
   const { plays, durations, artFor, artists, sync, syncNow, settings } = useApp()
   const [period, setPeriod] = useState<HomePeriod>('7d')
+  const periodRef = useRef<HTMLDivElement>(null)
+  useFadeOnChange(periodRef, period)
 
   const from = periodStart(period)
   const periodPlays = useMemo(() => playsIn(plays, from), [plays, from])
@@ -52,6 +55,7 @@ export function Home({ goToSettings }: { goToSettings: () => void }) {
               value={period}
               onChange={setPeriod}
             />
+            <div ref={periodRef}>
             <div className="kpi-row">
               <div className="stat-tile">
                 <div className="value">{fmtInt(msToMin(t.ms))}</div>
@@ -68,7 +72,8 @@ export function Home({ goToSettings }: { goToSettings: () => void }) {
             </div>
             <div className="card">
               <div className="card-title">Minutes by day</div>
-              <BarChart points={series} />
+              <BarChart points={series} animateKey={period} />
+            </div>
             </div>
             {recent.length > 0 && (
               <div className="card">

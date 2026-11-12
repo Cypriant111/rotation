@@ -6,8 +6,10 @@ import App from './App'
 import { AppProvider } from './state/store'
 import { announceUpdate } from './lib/sw'
 import { initInstall } from './lib/install'
+import { initPressFeedback } from './lib/motion'
 
 initInstall()
+initPressFeedback()
 
 // The app should feel like an app, not a page you can pinch out of shape.
 // iOS ignores user-scalable=no, so block its proprietary gesture events too.

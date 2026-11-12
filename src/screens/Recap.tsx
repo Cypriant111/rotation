@@ -16,6 +16,7 @@ import { fmtInt, msToMin } from '../lib/format'
 import { Heatmap } from '../components/Heatmap'
 import { Chips } from '../components/Segmented'
 import { canvasToBlob, renderCard, shareCard } from '../lib/share'
+import { useFadeOnChange, usePresence } from '../lib/motion'
 import type { CardData, CardFormat } from '../lib/share'
 
 type RecapPeriod = 'this-month' | 'last-month' | 'this-year' | 'all'
@@ -31,6 +32,11 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
   const { plays, durations, artists: ak } = useApp()
   const [period, setPeriod] = useState<RecapPeriod>('this-month')
   const [preview, setPreview] = useState<{ url: string; blob: Blob; format: CardFormat } | null>(null)
+  // the sheet stays mounted through its exit; `preview` is kept until then
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetMounted, sheetVisible] = usePresence(sheetOpen, 200)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useFadeOnChange(contentRef, period)
   const blobs = useRef<Partial<Record<CardFormat, Blob>>>({})
 
   const range = useMemo(() => rangeFor(period), [period])
@@ -86,7 +92,15 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
       if (prev) URL.revokeObjectURL(prev.url)
       return { url: URL.createObjectURL(blob), blob, format }
     })
+    setSheetOpen(true)
   }
+
+  // free the image once the exit transition is over
+  useEffect(() => {
+    if (sheetOpen || sheetMounted || !preview) return
+    URL.revokeObjectURL(preview.url)
+    setPreview(null)
+  }, [sheetOpen, sheetMounted, preview])
 
   async function doShare() {
     if (!preview) return
@@ -96,8 +110,7 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
   }
 
   function closePreview() {
-    if (preview) URL.revokeObjectURL(preview.url)
-    setPreview(null)
+    setSheetOpen(false)
   }
 
   const empty = periodPlays.length === 0
@@ -118,6 +131,7 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
           value={period}
           onChange={setPeriod}
         />
+        <div ref={contentRef}>
         {empty ? (
           <div className="empty">
             <p>No plays in {range.label}.</p>
@@ -225,9 +239,10 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
             </div>
           </>
         )}
+        </div>
       </main>
-      {preview && (
-        <div className="modal-backdrop" onClick={closePreview}>
+      {sheetMounted && preview && (
+        <div className="modal-backdrop" data-open={sheetVisible} onClick={closePreview}>
           <div
             className="modal"
             role="dialog"

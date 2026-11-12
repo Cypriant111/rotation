@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from './state/store'
 import { applyUpdate, onUpdateReady } from './lib/sw'
 import { promptInstall, useInstall } from './lib/install'
+import { ScreenActiveProvider, usePresence } from './lib/motion'
 import { Home } from './screens/Home'
 import { Top } from './screens/Top'
 import { Mixes } from './screens/Mixes'
@@ -81,6 +82,11 @@ export default function App() {
     return () => clearTimeout(id)
   }, [toast])
 
+  // the toast fades out instead of vanishing; keep its text through the exit
+  const [toastMounted, toastVisible] = usePresence(Boolean(toast), 200)
+  const lastToast = useRef('')
+  if (toast) lastToast.current = toast
+
   if (!ready) return null
 
   return (
@@ -127,16 +133,24 @@ export default function App() {
         </div>
       )}
       <div hidden={tab !== 'home'}>
-        <Home goToSettings={() => setTab('settings')} />
+        <ScreenActiveProvider active={tab === 'home'}>
+          <Home goToSettings={() => setTab('settings')} />
+        </ScreenActiveProvider>
       </div>
       <div hidden={tab !== 'top'}>
-        <Top />
+        <ScreenActiveProvider active={tab === 'top'}>
+          <Top />
+        </ScreenActiveProvider>
       </div>
       <div hidden={tab !== 'mixes'}>
-        <Mixes showToast={setToast} />
+        <ScreenActiveProvider active={tab === 'mixes'}>
+          <Mixes showToast={setToast} />
+        </ScreenActiveProvider>
       </div>
       <div hidden={tab !== 'recap'}>
-        <Recap showToast={setToast} />
+        <ScreenActiveProvider active={tab === 'recap'}>
+          <Recap showToast={setToast} />
+        </ScreenActiveProvider>
       </div>
       <div hidden={tab !== 'settings'}>
         <Settings showToast={setToast} />
@@ -151,9 +165,9 @@ export default function App() {
           ))}
         </div>
       </nav>
-      {toast && (
-        <div className="toast" role="status" aria-live="polite">
-          {toast}
+      {toastMounted && (
+        <div className="toast" role="status" aria-live="polite" data-open={toastVisible}>
+          {toast || lastToast.current}
         </div>
       )}
       {updateReady && (

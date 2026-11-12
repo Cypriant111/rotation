@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useGrowOnShow } from '../lib/motion'
 import type { DayPoint } from '../lib/stats'
 import { fmtDayKey, fmtDayKeyFull, fmtInt, msToMin, weekdayNarrow } from '../lib/format'
 
 interface Props {
   points: DayPoint[]
+  /** columns grow from the axis when this changes (and on first show) */
+  animateKey?: unknown
 }
 
 function niceCeil(n: number): number {
@@ -21,8 +24,10 @@ const AXIS_Y = PLOT_H + 4
 const W = 340
 
 /** Daily listening minutes. Single series, accent hue, tap for values. */
-export function BarChart({ points }: Props) {
+export function BarChart({ points, animateKey }: Props) {
   const [sel, setSel] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  useGrowOnShow(svgRef, '.chart-bar', animateKey, 'scaleY(0)')
 
   // stale selection points at the wrong day after a period switch
   useEffect(() => setSel(null), [points])
@@ -77,6 +82,7 @@ export function BarChart({ points }: Props) {
         )}
       </div>
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', display: 'block' }}
         role="img"
@@ -105,6 +111,7 @@ export function BarChart({ points }: Props) {
             <g key={p.dayStart}>
               {h > 0 && (
                 <path
+                  className="chart-bar"
                   d={
                     h > cap
                       ? `M${x(i)},${PLOT_H} v${-(h - cap)} q0,${-cap} ${cap},${-cap} h${barW - cap * 2} q${cap},0 ${cap},${cap} v${h - cap} z`
