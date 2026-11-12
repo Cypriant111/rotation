@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        // link-preview image is for crawlers, not the offline app
+        globIgnores: ['og.png'],
         navigateFallback: '/rotation/index.html',
         runtimeCaching: [
           {

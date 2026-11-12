@@ -5,6 +5,9 @@ import './index.css'
 import App from './App'
 import { AppProvider } from './state/store'
 import { announceUpdate } from './lib/sw'
+import { initInstall } from './lib/install'
+
+initInstall()
 
 const updateSW = registerSW({
   immediate: true,

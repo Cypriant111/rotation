@@ -17,6 +17,22 @@ data exists, i.e. after a CSV import). Each mix can be copied or shared as
 "Artist - Song" lines (playlist-importer Shortcuts read that format), and each
 row opens the song in Apple Music.
 
+<p>
+  <img src="docs/screenshots/home.png" width="190" alt="Home: minutes, plays and artists for the last 7 days, with a daily bar chart">
+  <img src="docs/screenshots/top.png" width="190" alt="Top: artists ranked by plays this month">
+  <img src="docs/screenshots/mixes.png" width="190" alt="Mixes: Heavy Rotation, a ranked list of songs">
+  <img src="docs/screenshots/recap.png" width="190" alt="Recap: minutes listened this month, top artists and share buttons">
+</p>
+
+*Screenshots use the built-in sample data: the artists are made up.*
+
+## Try the demo
+
+Open **[cypriant111.github.io/rotation/?demo](https://cypriant111.github.io/rotation/?demo)**
+(or tap **See it with sample data** on the empty Home screen). It loads about six
+months of invented listening history into memory, so every screen works right
+away. Nothing is saved; **Exit demo** in the red bar takes you back.
+
 ## How it gets your listening data
 
 Apple doesn't offer a listening-history API, so Rotation combines two sources:
@@ -28,13 +44,18 @@ Apple doesn't offer a listening-history API, so Rotation combines two sources:
    full play history since ~2015; Rotation imports them locally and merges
    them with the Last.fm data (duplicates are detected and skipped).
 
-## Install on your iPhone
+## Install on your phone
+
+**iPhone:**
 
 1. Open the deployed app in Safari.
 2. Tap the share button, then **Add to Home Screen**.
 3. **Open the installed app** and do your setup there - iOS gives the
    installed app its own separate storage, so anything you set up in the
    Safari tab does not carry over.
+
+**Android:** open the app in Chrome and tap **Install** in the banner (or ⋮ ▸
+**Install app**). The installed app shares its data with the browser.
 
 ## Set up automatic tracking (Last.fm)
 
@@ -77,7 +98,13 @@ npm run dev        # dev server at http://localhost:5173/rotation/
 npm test           # vitest unit tests (stats engine, parsers)
 npm run build      # production build to dist/
 npm run icons      # regenerate PWA icons from the SVG master
+npm run og         # regenerate the 1200x630 link-preview image (public/og.png)
 ```
+
+With the dev server running, `node scripts/screenshots.mjs` drives headless
+Chrome to refresh the README screenshots and reports each tab's
+`scrollWidth` (horizontal-overflow check); see the options at the top of the
+script.
 
 Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 The Vite `base` is `/rotation/`; if you fork under a different repo name,
@@ -90,3 +117,5 @@ change `base` in `vite.config.ts` and the icon/start_url paths in
 - The only network calls are to the Last.fm API (your scrobbles, with your own
   API key) and Last.fm's image CDN for album artwork.
 - Settings ▸ Data lets you export everything as JSON or delete it per source.
+
+Rotation is not affiliated with Apple or Last.fm.

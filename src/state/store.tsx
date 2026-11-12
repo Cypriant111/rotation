@@ -22,7 +22,14 @@ const META_TTL_MS = 7 * 86_400_000
 
 interface AppState {
   ready: boolean
+  /** what the screens show: demo plays while demo mode is on, else the user's own */
   plays: Play[]
+  /** the user's own stored plays, regardless of demo mode */
+  ownPlays: Play[]
+  /** demo mode: synthetic plays in memory only, nothing written to IndexedDB */
+  demo: boolean
+  startDemo: () => Promise<void>
+  exitDemo: () => void
   settings: Settings
   durations: DurationMap
   albumArt: Record<string, string>
@@ -35,6 +42,8 @@ interface AppState {
   clearSource: (source: 'lastfm' | 'csv') => Promise<void>
   saveSettings: (patch: Partial<Settings>) => Promise<void>
 }
+
+const NO_ART: Record<string, string> = {}
 
 const Ctx = createContext<AppState | null>(null)
 
@@ -52,6 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [albumArt, setAlbumArt] = useState<Record<string, string>>({})
   const [sync, setSync] = useState<SyncStatus>({ state: 'idle', lastSyncAt: null })
   const [importing, setImporting] = useState(false)
+  const [demoPlays, setDemoPlays] = useState<Play[] | null>(null)
   const syncing = useRef(false)
   // bumped by disconnect/clearSource so an in-flight sync discards its results
   const syncGen = useRef(0)
@@ -200,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(
     async (user: string, apiKey: string) => {
       const info = await getUserInfo(user.trim(), apiKey.trim())
+      setDemoPlays(null)
       const prevUser = settingsRef.current.lastfmUser
       if (prevUser && prevUser.toLowerCase() !== info.name.toLowerCase()) {
         // switching accounts: the old account's scrobbles must not blend in
@@ -245,6 +256,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const importCsv = useCallback(
     async (file: File, onProgress?: (rows: number, kept: number) => void) => {
       setImporting(true)
+      setDemoPlays(null)
       try {
         const index = buildDedupeIndex(playsRef.current)
         const knownArtists = buildArtistIndex(playsRef.current)
@@ -281,6 +293,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [saveSettings],
   )
 
+  const startDemo = useCallback(async () => {
+    const { generateDemoPlays } = await import('../lib/demo')
+    setDemoPlays(generateDemoPlays())
+  }, [])
+
+  const exitDemo = useCallback(() => setDemoPlays(null), [])
+
   // auto-sync when the app opens or returns to foreground
   useEffect(() => {
     if (!ready || !settings.autoSync || !settings.lastfmUser) return
@@ -296,10 +315,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       ready,
-      plays,
+      plays: demoPlays ?? plays,
+      ownPlays: plays,
+      demo: demoPlays !== null,
+      startDemo,
+      exitDemo,
       settings,
       durations,
-      albumArt,
+      // demo artists are invented: no artwork, monograms only
+      albumArt: demoPlays ? NO_ART : albumArt,
       sync,
       importing,
       connect,
@@ -309,7 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearSource,
       saveSettings,
     }),
-    [ready, plays, settings, durations, albumArt, sync, importing, connect, disconnect, runSync, importCsv, clearSource, saveSettings],
+    [ready, plays, demoPlays, startDemo, exitDemo, settings, durations, albumArt, sync, importing, connect, disconnect, runSync, importCsv, clearSource, saveSettings],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

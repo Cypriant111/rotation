@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from './state/store'
 import { applyUpdate, onUpdateReady } from './lib/sw'
+import { promptInstall, useInstall } from './lib/install'
 import { Home } from './screens/Home'
 import { Top } from './screens/Top'
 import { Mixes } from './screens/Mixes'
@@ -18,28 +19,61 @@ const TABS: { key: Tab; label: string; icon: (active: boolean) => React.ReactNod
   { key: 'settings', label: 'Settings', icon: () => <IconSettings /> },
 ]
 
-function isStandalone(): boolean {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  )
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
 }
 
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+function writeFlag(key: string) {
+  try {
+    localStorage.setItem(key, '1')
+  } catch {
+    /* private mode: the banner simply comes back next time */
+  }
+}
+
+/** `?demo` in the URL opens straight into demo mode (README / shared links). */
+function wantsDemo(): boolean {
+  return new URLSearchParams(window.location.search).has('demo')
+}
+
+function dropDemoParam() {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('demo')) return
+  url.searchParams.delete('demo')
+  history.replaceState(null, '', url.pathname + url.search + url.hash)
 }
 
 export default function App() {
-  const { ready } = useApp()
+  const { ready, demo, startDemo, exitDemo } = useApp()
+  const install = useInstall()
   const [tab, setTab] = useState<Tab>('home')
   const [toast, setToast] = useState('')
-  const [showInstall, setShowInstall] = useState(false)
+  const [installDismissed, setInstallDismissed] = useState(() => readFlag('installDismissed'))
   const [updateReady, setUpdateReady] = useState(false)
 
   useEffect(() => {
-    setShowInstall(isIOS() && !isStandalone() && localStorage.getItem('installDismissed') !== '1')
     onUpdateReady(() => setUpdateReady(true))
-  }, [])
+    if (wantsDemo()) startDemo()
+  }, [startDemo])
+
+  const showInstall =
+    !installDismissed &&
+    !install.standalone &&
+    (install.platform === 'ios' || (install.platform === 'android' && install.canPrompt))
+
+  function dismissInstall() {
+    writeFlag('installDismissed')
+    setInstallDismissed(true)
+  }
+
+  function leaveDemo() {
+    exitDemo()
+    dropDemoParam()
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -50,23 +84,43 @@ export default function App() {
   if (!ready) return null
 
   return (
-    <div className="app">
+    <div className={`app${demo ? ' has-demo' : ''}`}>
+      {demo && (
+        <div className="demo-bar" role="status">
+          <span>
+            <strong>Demo data</strong> · nothing is saved
+          </span>
+          <button onClick={leaveDemo}>Exit demo</button>
+        </div>
+      )}
       {showInstall && (
         <div style={{ padding: '0 16px' }}>
-          <div className="install-banner" style={{ marginTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}>
-            <div>
-              <strong>Add Rotation to your Home Screen first.</strong> Tap the share button in Safari,
-              then “Add to Home Screen” — the installed app keeps its own data, so connect your
-              sources in there.
-            </div>
-            <button
-              className="dismiss"
-              aria-label="Dismiss"
-              onClick={() => {
-                localStorage.setItem('installDismissed', '1')
-                setShowInstall(false)
-              }}
-            >
+          <div
+            className="install-banner"
+            style={demo ? undefined : { marginTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+          >
+            {install.platform === 'ios' ? (
+              <div>
+                <strong>Add Rotation to your Home Screen first.</strong> Tap the share button in Safari,
+                then “Add to Home Screen” — the installed app keeps its own data, so connect your
+                sources in there.
+              </div>
+            ) : (
+              <div className="install-banner-main">
+                <div>
+                  <strong>Install Rotation</strong> to open it from your home screen like any other app.
+                </div>
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    if (await promptInstall()) dismissInstall()
+                  }}
+                >
+                  Install
+                </button>
+              </div>
+            )}
+            <button className="dismiss" aria-label="Dismiss" onClick={dismissInstall}>
               ✕
             </button>
           </div>

@@ -2,10 +2,12 @@ import { useMemo, useRef, useState } from 'react'
 import { useApp } from '../state/store'
 import { fmtAgo, fmtInt } from '../lib/format'
 import type { ImportResult } from '../lib/csv'
+import { useInstall } from '../lib/install'
 
 export function Settings({ showToast }: { showToast: (msg: string) => void }) {
   const app = useApp()
-  const { settings, plays, sync } = app
+  // Settings always manages the user's own data, even while the demo is on
+  const { settings, ownPlays: plays, sync } = app
 
   const [user, setUser] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -15,6 +17,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importError, setImportError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const isIOS = useInstall().platform === 'ios'
 
   const counts = useMemo(() => {
     let lastfm = 0
@@ -277,9 +280,31 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
         </div>
 
         <div className="note" style={{ padding: '0 4px' }}>
-          Rotation keeps all data in this app’s local storage. If you use it in Safari and then add it
-          to your Home Screen, the installed app starts fresh — set up your sources from inside the
-          installed app.
+          Rotation keeps all data in this app’s local storage.
+          {isIOS
+            ? ' If you use it in Safari and then add it to your Home Screen, the installed app starts fresh — set up your sources from inside the installed app.'
+            : ''}
+        </div>
+
+        <div className="section-label">About</div>
+        <div className="card about">
+          <p>
+            <strong>Your data stays on this device.</strong> Listening history, settings and your
+            Last.fm key are kept in this browser’s storage. Nothing is uploaded: no account, no
+            analytics, no ads.
+          </p>
+          <p>
+            <strong>Network connections.</strong> The Last.fm API (ws.audioscrobbler.com), to fetch
+            your scrobbles with your own key, and Last.fm’s image server (lastfm.freetls.fastly.net)
+            for album artwork. The app itself loads from GitHub Pages.
+          </p>
+          <p>Rotation is not affiliated with Apple or Last.fm.</p>
+          <p>
+            Open source:{' '}
+            <a href="https://github.com/Cypriant111/rotation" target="_blank" rel="noreferrer">
+              github.com/Cypriant111/rotation
+            </a>
+          </p>
         </div>
       </main>
     </>

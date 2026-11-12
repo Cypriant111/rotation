@@ -5,7 +5,7 @@ import { fmtAgo, fmtInt, msToMin } from '../lib/format'
 import { BarChart } from '../components/BarChart'
 import { Segmented } from '../components/Segmented'
 import { Artwork } from '../components/Artwork'
-import { Mark } from '../components/Icons'
+import { FirstRun } from '../components/FirstRun'
 import { albumArtKey } from '../lib/lastfm'
 
 type HomePeriod = '7d' | '30d'
@@ -42,17 +42,7 @@ export function Home({ goToSettings }: { goToSettings: () => void }) {
       </header>
       <main>
         {!hasAnything ? (
-          <div className="empty">
-            <Mark size={64} />
-            <h2>No listening data yet</h2>
-            <p>
-              Connect Last.fm for automatic tracking, or import your Apple&nbsp;Music history from an
-              Apple privacy export.
-            </p>
-            <button className="btn" onClick={goToSettings}>
-              Get set up
-            </button>
-          </div>
+          <FirstRun goToSettings={goToSettings} />
         ) : (
           <>
             <Segmented
