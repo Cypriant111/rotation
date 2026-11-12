@@ -9,6 +9,12 @@ import { initInstall } from './lib/install'
 
 initInstall()
 
+// The app should feel like an app, not a page you can pinch out of shape.
+// iOS ignores user-scalable=no, so block its proprietary gesture events too.
+for (const type of ['gesturestart', 'gesturechange']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false })
+}
+
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {

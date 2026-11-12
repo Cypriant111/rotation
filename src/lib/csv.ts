@@ -274,6 +274,7 @@ export function parseAppleCsv(
   knownArtists: Map<string, string>,
   onBatch: (plays: Play[]) => Promise<void>,
   onProgress?: (p: ImportProgress) => void,
+  artistKey: (a: string) => string = norm,
 ): Promise<ImportResult> {
   return new Promise((resolve, reject) => {
     let headerMap: Partial<Record<Field, string>> | null = null
@@ -344,7 +345,7 @@ export function parseAppleCsv(
                 skipEvents++
                 continue
               }
-              if (existingKeys.has(dedupeKey(p.artist, p.track, p.ts))) {
+              if (existingKeys.has(dedupeKey(p.artist, p.track, p.ts, artistKey))) {
                 duplicates++
                 continue
               }
@@ -375,19 +376,25 @@ export function parseAppleCsv(
   })
 }
 
-/** 5-minute-bucket key for cross-source dedupe. */
-export function dedupeKey(artist: string, track: string, ts: number): string {
-  return `${norm(artist)}|${norm(track)}|${Math.round(ts / 300_000)}`
+/** 5-minute-bucket key for cross-source dedupe. `artistKey` folds
+ *  collaborations ("Mata & DJ Flip" -> "mata") the same way the stats do. */
+export function dedupeKey(
+  artist: string,
+  track: string,
+  ts: number,
+  artistKey: (a: string) => string = norm,
+): string {
+  return `${artistKey(artist)}|${norm(track)}|${Math.round(ts / 300_000)}`
 }
 
 /** Keys for existing plays; includes neighbor buckets so boundary cases match.
  *  Skip events are excluded — a skip must never mask a real play as duplicate. */
-export function buildDedupeIndex(plays: Play[]): Set<string> {
+export function buildDedupeIndex(plays: Play[], artistKey: (a: string) => string = norm): Set<string> {
   const set = new Set<string>()
   for (const p of plays) {
     if (p.skip) continue
     const bucket = Math.round(p.ts / 300_000)
-    const base = `${norm(p.artist)}|${norm(p.track)}|`
+    const base = `${artistKey(p.artist)}|${norm(p.track)}|`
     set.add(base + (bucket - 1))
     set.add(base + bucket)
     set.add(base + (bucket + 1))

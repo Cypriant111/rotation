@@ -173,8 +173,11 @@ export function BarChart({ points }: Props) {
           </text>
         )}
       </svg>
-      {/* the WCAG-clean twin: every value reachable without the tooltip */}
-      <table className="sr-only">
+      {/* the WCAG-clean twin: every value reachable without the tooltip.
+          sr-only sits on the wrapper: tables ignore width:1px/overflow, and
+          the 24-column heatmap table alone made the page 1200px wide */}
+      <div className="sr-only">
+        <table>
         <caption>Minutes listened per day</caption>
         <thead>
           <tr>
@@ -192,7 +195,8 @@ export function BarChart({ points }: Props) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   )
 }

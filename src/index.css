@@ -62,6 +62,8 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* scrolling yes, pinch-zoom and double-tap zoom no */
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -277,16 +279,32 @@ a.rank-row {
   overflow: hidden;
 }
 
+/* bar + number + artwork + names; the count column sits outside it, so the
+   bar can never run under the numbers */
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  align-self: stretch;
+  margin: -9px 0 -9px -10px;
+  padding: 9px 0 9px 10px;
+  position: relative;
+}
+
 /* the Last.fm move: plays-vs-#1 bar behind the row */
-.rank-row .row-bar {
+.row-bar {
   position: absolute;
-  inset: 3px auto 3px 0;
+  inset: 3px 0 3px 0;
   background: var(--accent-wash);
   border-radius: 7px;
   pointer-events: none;
+  transform-origin: left center;
+  transform: scaleX(var(--r, 1));
 }
 
-.rank-row > *:not(.row-bar) {
+.row-body > *:not(.row-bar) {
   position: relative;
 }
 
@@ -559,6 +577,11 @@ a.rank-row {
   font-size: 13px;
   color: var(--ink-2);
   margin-top: 2px;
+}
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .settings-row .trailing {
@@ -907,15 +930,6 @@ a.rank-row {
   max-width: 600px;
   max-height: 88dvh;
   overflow-y: auto;
-}
-
-.modal .grabber {
-  width: 36px;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--ink-3);
-  opacity: 0.4;
-  margin: 0 auto 14px;
 }
 
 .modal img.card-preview {

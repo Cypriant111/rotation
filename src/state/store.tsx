@@ -7,6 +7,9 @@ import type { ImportResult } from '../lib/csv'
 import { fetchAlbumArt, fetchDurations, fetchScrobbles, getUserInfo } from '../lib/lastfm'
 import type { DurationMap, Play, Settings } from '../lib/types'
 import { DEFAULT_SETTINGS } from '../lib/types'
+import type { ArtistKeyer } from '../lib/artists'
+import { makeArtistKeyer } from '../lib/artists'
+import { buildTrackAlbums, findArtwork } from '../lib/artwork'
 
 export type SyncStatus =
   | { state: 'idle'; lastSyncAt: number | null }
@@ -33,6 +36,11 @@ interface AppState {
   settings: Settings
   durations: DurationMap
   albumArt: Record<string, string>
+  /** collaboration-aware artist keys over the plays on screen */
+  artists: ArtistKeyer
+  /** artwork URL for a row: lead artist + cleaned album, with the album of the
+   *  same song from Last.fm when the row has none (CSV plays) */
+  artFor: (artist: string, album: string, track?: string) => string | undefined
   sync: SyncStatus
   importing: boolean
   connect: (user: string, apiKey: string) => Promise<{ playcount: number }>
@@ -182,8 +190,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // a play already imported from an Apple CSV must not count twice
         const csvPlays = playsRef.current.filter((p) => p.source === 'csv')
         if (csvPlays.length > 0) {
-          const csvIndex = buildDedupeIndex(csvPlays)
-          incoming = incoming.filter((p) => !csvIndex.has(dedupeKey(p.artist, p.track, p.ts)))
+          const ak = makeArtistKeyer([...playsRef.current, ...incoming]).key
+          const csvIndex = buildDedupeIndex(csvPlays, ak)
+          incoming = incoming.filter((p) => !csvIndex.has(dedupeKey(p.artist, p.track, p.ts, ak)))
         }
 
         if (gen !== syncGen.current) return // disconnected mid-sync; discard
@@ -258,7 +267,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setImporting(true)
       setDemoPlays(null)
       try {
-        const index = buildDedupeIndex(playsRef.current)
+        const ak = makeArtistKeyer(playsRef.current).key
+        const index = buildDedupeIndex(playsRef.current, ak)
         const knownArtists = buildArtistIndex(playsRef.current)
         const collected: Play[] = []
         const result = await parseAppleCsv(
@@ -270,6 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             collected.push(...batch)
           },
           (p) => onProgress?.(p.rows, p.kept),
+          ak,
         )
         mergePlays(collected)
         return result
@@ -312,10 +323,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, settings.lastfmUser, settings.autoSync])
 
+  const shownPlays = demoPlays ?? plays
+  const shownArt = demoPlays ? NO_ART : albumArt
+  const artists = useMemo(() => makeArtistKeyer(shownPlays), [shownPlays])
+
+  const trackAlbums = useMemo(() => buildTrackAlbums(shownPlays, artists), [shownPlays, artists])
+  const artFor = useCallback(
+    (artist: string, album: string, track?: string) =>
+      findArtwork(shownArt, artists, trackAlbums, artist, album, track),
+    [artists, shownArt, trackAlbums],
+  )
+
   const value = useMemo<AppState>(
     () => ({
       ready,
-      plays: demoPlays ?? plays,
+      plays: shownPlays,
       ownPlays: plays,
       demo: demoPlays !== null,
       startDemo,
@@ -323,7 +345,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       settings,
       durations,
       // demo artists are invented: no artwork, monograms only
-      albumArt: demoPlays ? NO_ART : albumArt,
+      albumArt: shownArt,
+      artists,
+      artFor,
       sync,
       importing,
       connect,
@@ -333,7 +357,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearSource,
       saveSettings,
     }),
-    [ready, plays, demoPlays, startDemo, exitDemo, settings, durations, albumArt, sync, importing, connect, disconnect, runSync, importCsv, clearSource, saveSettings],
+    [ready, shownPlays, plays, demoPlays, startDemo, exitDemo, settings, shownArt, artists, artFor, durations, sync, importing, connect, disconnect, runSync, importCsv, clearSource, saveSettings],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

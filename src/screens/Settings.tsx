@@ -4,6 +4,9 @@ import { fmtAgo, fmtInt } from '../lib/format'
 import type { ImportResult } from '../lib/csv'
 import { useInstall } from '../lib/install'
 
+/** Daily Tracks is a few MB even for a decade of listening; Play Activity runs to hundreds. */
+const LARGE_FILE_BYTES = 50 * 1_048_576
+
 export function Settings({ showToast }: { showToast: (msg: string) => void }) {
   const app = useApp()
   // Settings always manages the user's own data, even while the demo is on
@@ -28,7 +31,8 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
         skips++
         continue
       }
-      p.source === 'lastfm' ? lastfm++ : csv++
+      if (p.source === 'lastfm') lastfm++
+      else csv++
     }
     return { lastfm, csv, skips }
   }, [plays])
@@ -54,6 +58,16 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
 
   async function onFile(file: File | undefined) {
     if (!file) return
+    if (file.size > LARGE_FILE_BYTES) {
+      const mb = Math.round(file.size / 1_048_576)
+      const ok = window.confirm(
+        `This file is ${fmtInt(mb)} MB, which looks like the big “Play Activity” file. Recent exports of it have no artist names, so most plays can’t be matched. “Apple Music - Play History Daily Tracks.csv” from the same folder works better. Import this file anyway?`,
+      )
+      if (!ok) {
+        if (fileRef.current) fileRef.current.value = ''
+        return
+      }
+    }
     setImportError('')
     setImportResult(null)
     setImportProgress({ rows: 0, kept: 0 })
@@ -240,8 +254,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
               <li>Apple prepares the download in up to 7 days and emails you.</li>
               <li>
                 In the download, open the <strong>Apple Music Activity</strong> folder and import{' '}
-                <strong>Apple Music - Play History Daily Tracks.csv</strong> here. (The bigger “Play
-                Activity” file works too.)
+                <strong>Apple Music - Play History Daily Tracks.csv</strong> here.
               </li>
             </ol>
             Everything stays on this device — the file is never uploaded anywhere.
@@ -251,7 +264,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
         <div className="section-label">Data</div>
         <div className="card">
           <div className="settings-row">
-            <div>
+            <div className="settings-main">
               All plays
               <div className="hint">
                 {fmtInt(counts.lastfm + counts.csv)} plays · {fmtInt(counts.lastfm)} Last.fm ·{' '}

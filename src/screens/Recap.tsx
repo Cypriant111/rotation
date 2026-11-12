@@ -3,6 +3,7 @@ import { useApp } from '../state/store'
 import {
   hourMatrix,
   monthRange,
+  periodStreak,
   playsIn,
   skipStats,
   streaks,
@@ -27,7 +28,7 @@ function rangeFor(p: RecapPeriod): { from: number; to: number; label: string } {
 }
 
 export function Recap({ showToast }: { showToast: (msg: string) => void }) {
-  const { plays, durations } = useApp()
+  const { plays, durations, artists: ak } = useApp()
   const [period, setPeriod] = useState<RecapPeriod>('this-month')
   const [preview, setPreview] = useState<{ url: string; blob: Blob; format: CardFormat } | null>(null)
   const blobs = useRef<Partial<Record<CardFormat, Blob>>>({})
@@ -37,11 +38,13 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
     () => playsIn(plays, range.from, range.to),
     [plays, range],
   )
-  const t = useMemo(() => totals(periodPlays, durations), [periodPlays, durations])
-  const artists = useMemo(() => topArtists(periodPlays, durations, 5), [periodPlays, durations])
-  const tracks = useMemo(() => topTracks(periodPlays, durations, 5), [periodPlays, durations])
+  const t = useMemo(() => totals(periodPlays, durations, ak), [periodPlays, durations, ak])
+  const artists = useMemo(() => topArtists(periodPlays, durations, 5, ak), [periodPlays, durations, ak])
+  const tracks = useMemo(() => topTracks(periodPlays, durations, 5, ak), [periodPlays, durations, ak])
   const matrix = useMemo(() => hourMatrix(periodPlays, durations), [periodPlays, durations])
   const s = useMemo(() => streaks(plays), [plays])
+  // live streak only for periods that include today; finished ones show their best run
+  const ps = useMemo(() => periodStreak(plays, range), [plays, range])
   const sk = useMemo(() => skipStats(periodPlays, 3), [periodPlays])
 
   const cardData: CardData = useMemo(
@@ -50,12 +53,13 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
       minutes: msToMin(t.ms),
       plays: t.plays,
       artists: t.artists,
-      streak: s.current,
+      streak: ps.value,
+      streakLabel: ps.label,
       topArtists: artists,
       topTracks: tracks,
       estimated: t.estimated,
     }),
-    [range, t, s, artists, tracks],
+    [range, t, ps, artists, tracks],
   )
 
   // pre-render cards so the share tap stays inside iOS's user-gesture window
@@ -137,10 +141,10 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
                   <div className="v">{fmtInt(t.tracks)}</div>
                   <div className="l">songs</div>
                 </div>
-                {s.current > 1 && (
+                {ps.value > 1 && (
                   <div className="item">
-                    <div className="v">{s.current}</div>
-                    <div className="l">day streak</div>
+                    <div className="v">{ps.value}</div>
+                    <div className="l">{ps.label}</div>
                   </div>
                 )}
               </div>
@@ -234,7 +238,6 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
               if (e.key === 'Escape') closePreview()
             }}
           >
-            <div className="grabber" />
             <img className="card-preview" src={preview.url} alt={`${range.label} recap card`} />
             <div className="share-actions">
               <button className="btn full" onClick={doShare} autoFocus>

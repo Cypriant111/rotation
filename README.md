@@ -12,8 +12,8 @@ The **Mixes** tab distills the data into playlist-shaped lists of what you
 actually like: *Heavy Rotation* (recency-weighted plays, corrected by how often
 you finish the song and how many separate days you reached for it), *On the
 Rise* (surging against your own baseline), *Old Flames* (heavily played, gone
-quiet for 60+ days), and *No Skips* (never once cut short - appears when skip
-data exists, i.e. after a CSV import). Each mix can be copied or shared as
+quiet for 60+ days), and *No Skips* (never once cut short - counted only from
+sources that report skips, i.e. the Apple CSV import; Last.fm doesn't). Each mix can be copied or shared as
 "Artist - Song" lines (playlist-importer Shortcuts read that format), and each
 row opens the song in Apple Music.
 
@@ -84,9 +84,9 @@ scrobbles in real time because it *is* the player.)
 2. Apple prepares the archive within about a week and emails you.
 3. Unzip it, open the **Apple Music Activity** folder, and import
    **`Apple Music - Play History Daily Tracks.csv`** in Rotation's Settings
-   tab. (The larger `Apple Music Play Activity.csv` is also supported; note
-   that 2026-era exports of that file no longer include an artist column, so
-   the daily-tracks file gives better results.)
+   tab. Use this file, not the much larger `Apple Music Play Activity.csv`:
+   recent exports of that one have no artist column (the app warns before
+   importing any file over 50 MB).
 
 The file is parsed entirely on your device and never uploaded.
 

@@ -8,17 +8,17 @@ import { Chips, Segmented } from '../components/Segmented'
 type Kind = 'artists' | 'tracks' | 'albums'
 
 export function Top() {
-  const { plays, durations, albumArt } = useApp()
+  const { plays, durations, artists } = useApp()
   const [kind, setKind] = useState<Kind>('artists')
   const [period, setPeriod] = useState<PeriodKey>('30d')
 
   const periodPlays = useMemo(() => playsIn(plays, periodStart(period)), [plays, period])
 
   const items = useMemo(() => {
-    if (kind === 'artists') return topArtists(periodPlays, durations)
-    if (kind === 'tracks') return topTracks(periodPlays, durations)
-    return topAlbums(periodPlays, durations)
-  }, [kind, periodPlays, durations])
+    if (kind === 'artists') return topArtists(periodPlays, durations, 50, artists)
+    if (kind === 'tracks') return topTracks(periodPlays, durations, 50, artists)
+    return topAlbums(periodPlays, durations, 50, artists)
+  }, [kind, periodPlays, durations, artists])
 
   return (
     <>
@@ -49,7 +49,6 @@ export function Top() {
             <RankList
               items={items}
               kind={kind === 'artists' ? 'artist' : kind === 'tracks' ? 'track' : 'album'}
-              albumArt={albumArt}
             />
           </div>
         )}

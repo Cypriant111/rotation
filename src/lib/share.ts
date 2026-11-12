@@ -7,6 +7,8 @@ export interface CardData {
   plays: number
   artists: number
   streak: number
+  /** 'day streak' for periods that include today, 'best run' for finished ones */
+  streakLabel: string
   topArtists: RankedItem[]
   topTracks: RankedItem[]
   estimated: boolean
@@ -114,7 +116,7 @@ export function renderCard(data: CardData, format: CardFormat): HTMLCanvasElemen
     [fmtInt(data.plays), 'plays'],
     [fmtInt(data.artists), 'artists'],
   ]
-  if (data.streak > 1) stats.push([String(data.streak), 'day streak'])
+  if (data.streak > 1) stats.push([String(data.streak), data.streakLabel])
   let sx = L.M
   for (const [value, label] of stats) {
     ctx.fillStyle = INK

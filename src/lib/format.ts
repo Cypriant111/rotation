@@ -64,3 +64,13 @@ export function fmtAgo(ts: number, now = Date.now()): string {
   if (d < 7) return `${d}d ago`
   return fmtDay(ts)
 }
+
+/** Up to two initials, letters and digits only ("G-Eazy" -> "G", "(What's) Up" -> "WU"). */
+export function initials(name: string): string {
+  const words = name
+    .split(/\s+/)
+    .map((w) => w.match(/[\p{L}\p{N}]/u)?.[0])
+    .filter((c): c is string => Boolean(c))
+  if (words.length === 0) return '?'
+  return words.slice(0, 2).join('').toUpperCase()
+}

@@ -2,18 +2,19 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../state/store'
 import { appleMusicSearchUrl, buildMixes, mixToText } from '../lib/affinity'
 import type { Mix } from '../lib/affinity'
-import { albumArtKey } from '../lib/lastfm'
 import { fmtInt } from '../lib/format'
 import { Artwork } from '../components/Artwork'
+import { RowBar } from '../components/RowBar'
 import { Mark } from '../components/Icons'
 
 const PREVIEW_ROWS = 6
 
 function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => void }) {
-  const { albumArt } = useApp()
+  const { artFor } = useApp()
   const [expanded, setExpanded] = useState(false)
   const rows = expanded ? mix.tracks : mix.tracks.slice(0, PREVIEW_ROWS)
-  const maxCount = mix.tracks[0]?.count ?? 1
+  // rows are ordered by score, so the bar shows score too (count stays as text)
+  const maxScore = mix.tracks[0]?.score || 1
 
   async function copy() {
     try {
@@ -55,15 +56,14 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
             rel="noreferrer"
             aria-label={`${t.name} by ${t.artist} — open in Apple Music`}
           >
-            <div
-              className="row-bar"
-              style={{ width: `${Math.max(4, (t.count / maxCount) * 100)}%` }}
-            />
-            <div className="rank-num">{i + 1}</div>
-            <Artwork name={t.name} url={t.album ? albumArt[albumArtKey(t.artist, t.album)] : undefined} />
-            <div className="rank-main">
-              <div className="rank-name">{t.name}</div>
-              <div className="rank-sub">{t.artist}</div>
+            <div className="row-body">
+              <RowBar ratio={t.score / maxScore} />
+              <div className="rank-num">{i + 1}</div>
+              <Artwork name={t.name} url={artFor(t.artist, t.album, t.name)} />
+              <div className="rank-main">
+                <div className="rank-name">{t.name}</div>
+                <div className="rank-sub">{t.artist}</div>
+              </div>
             </div>
             <div className="rank-count">
               {fmtInt(t.count)}
@@ -90,8 +90,8 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
 }
 
 export function Mixes({ showToast }: { showToast: (msg: string) => void }) {
-  const { plays, durations } = useApp()
-  const mixes = useMemo(() => buildMixes(plays, durations), [plays, durations])
+  const { plays, durations, artists } = useApp()
+  const mixes = useMemo(() => buildMixes(plays, durations, Date.now(), artists), [plays, durations, artists])
 
   return (
     <>

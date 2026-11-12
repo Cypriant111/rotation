@@ -114,8 +114,11 @@ export function Heatmap({ matrix }: Props) {
         ))}
         more
       </div>
-      {/* the WCAG-clean twin: every value reachable without the tooltip */}
-      <table className="sr-only">
+      {/* the WCAG-clean twin: every value reachable without the tooltip.
+          sr-only sits on the wrapper: tables ignore width:1px/overflow, and
+          the 24-column heatmap table alone made the page 1200px wide */}
+      <div className="sr-only">
+        <table>
         <caption>Minutes listened by weekday and hour</caption>
         <thead>
           <tr>
@@ -135,7 +138,8 @@ export function Heatmap({ matrix }: Props) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   )
 }

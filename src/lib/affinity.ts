@@ -1,6 +1,8 @@
 import type { DurationMap, Play } from './types'
-import { norm, resolvePlayMs } from './types'
+import { SKIP_AWARE_SOURCES, norm, resolvePlayMs } from './types'
 import { localDayStart } from './stats'
+import type { ArtistKeyer } from './artists'
+import { PLAIN_ARTISTS, cleanAlbum } from './artists'
 
 /**
  * Affinity scoring: turns the raw play/skip log into "what you actually
@@ -24,6 +26,8 @@ export interface TrackAgg {
   album: string
   plays: number
   skips: number
+  /** plays from sources that report skips (Apple CSV, Spotify); No Skips needs these */
+  skipAwarePlays: number
   ms: number
   daysPlayed: number
   firstTs: number
@@ -38,19 +42,25 @@ export interface TrackAgg {
   pPrior: number
 }
 
-export function aggregateTracks(plays: Play[], durations: DurationMap, now = Date.now()): TrackAgg[] {
+export function aggregateTracks(
+  plays: Play[],
+  durations: DurationMap,
+  now = Date.now(),
+  ak: ArtistKeyer = PLAIN_ARTISTS,
+): TrackAgg[] {
   const map = new Map<string, TrackAgg & { daySet: Set<number> }>()
   for (const p of plays) {
-    const key = norm(p.artist) + ' ' + norm(p.track)
+    const key = ak.key(p.artist) + '\0' + norm(p.track)
     let a = map.get(key)
     if (!a) {
       a = {
         key,
         name: p.track,
         artist: p.artist,
-        album: p.album,
+        album: cleanAlbum(p.album),
         plays: 0,
         skips: 0,
+        skipAwarePlays: 0,
         ms: 0,
         daysPlayed: 0,
         firstTs: Infinity,
@@ -63,12 +73,13 @@ export function aggregateTracks(plays: Play[], durations: DurationMap, now = Dat
       }
       map.set(key, a)
     }
-    if (!a.album && p.album) a.album = p.album
+    if (!a.album && p.album) a.album = cleanAlbum(p.album)
     if (p.skip) {
       a.skips++
       continue
     }
     a.plays++
+    if (SKIP_AWARE_SOURCES.has(p.source)) a.skipAwarePlays++
     a.ms += resolvePlayMs(p, durations)
     if (p.ts < a.firstTs) a.firstTs = p.ts
     if (p.ts > a.lastTs) a.lastTs = p.ts
@@ -155,15 +166,26 @@ export function oldFlames(aggs: TrackAgg[], now = Date.now()): MixTrack[] {
   )
 }
 
-/** Songs you never cut short. Only meaningful once skip data exists. */
+/**
+ * Songs you never cut short. Last.fm doesn't report skips, so only plays
+ * from skip-aware sources count toward the five: a track known only from
+ * Last.fm has no evidence either way.
+ */
 export function noSkips(aggs: TrackAgg[]): MixTrack[] {
   return top(
-    aggs.filter((a) => a.plays >= 5 && a.skips === 0).map((a) => toMixTrack(a, a.plays, a.plays)),
+    aggs
+      .filter((a) => a.skipAwarePlays >= 5 && a.skips === 0)
+      .map((a) => toMixTrack(a, a.plays, a.skipAwarePlays)),
   )
 }
 
-export function buildMixes(plays: Play[], durations: DurationMap, now = Date.now()): Mix[] {
-  const aggs = aggregateTracks(plays, durations, now)
+export function buildMixes(
+  plays: Play[],
+  durations: DurationMap,
+  now = Date.now(),
+  ak: ArtistKeyer = PLAIN_ARTISTS,
+): Mix[] {
+  const aggs = aggregateTracks(plays, durations, now, ak)
   const hasSkipData = aggs.some((a) => a.skips > 0)
   const mixes: Mix[] = [
     {
