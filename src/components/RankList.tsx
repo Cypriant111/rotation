@@ -1,51 +1,44 @@
-import type { RankedItem } from '../lib/stats'
-import { fmtInt } from '../lib/format'
-import { useApp } from '../state/store'
-import { Artwork } from './Artwork'
-import { RowBar } from './RowBar'
 import { useRef } from 'react'
+import type { RankedItem } from '../lib/stats'
 import { useGrowOnShow } from '../lib/motion'
+import { Cover } from './Cover'
+import { Row } from './Row'
 
 interface Props {
   items: RankedItem[]
   kind: 'artist' | 'track' | 'album'
+  unit?: string
   /** bars grow from zero when this changes (and on first show) */
   animateKey?: unknown
 }
 
-export function RankList({ items, kind, animateKey }: Props) {
-  const { artFor } = useApp()
+export function RankList({ items, kind, unit = 'plays', animateKey }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   useGrowOnShow(ref, '.row-bar', animateKey, 'scaleX(0)')
   if (items.length === 0) return null
   const max = items[0].plays
 
   return (
-    <div className="rank-list" ref={ref}>
+    <div className="list" ref={ref}>
       {items.map((item, i) => (
-        <div className="rank-row" key={`${item.name}|${item.sub}`}>
-          <div className="row-body">
-            <RowBar ratio={item.plays / max} />
-            <div className="rank-num">{i + 1}</div>
-            <Artwork
+        <Row
+          key={`${item.name}|${item.sub}`}
+          num={i + 1}
+          art={
+            <Cover
+              kind={kind}
               name={item.name}
-              url={
-                kind === 'artist'
-                  ? undefined
-                  : artFor(item.artist, item.album, kind === 'track' ? item.name : undefined)
-              }
-              round={kind === 'artist'}
+              artist={item.artist}
+              album={item.album}
+              track={kind === 'track' ? item.name : undefined}
             />
-            <div className="rank-main">
-              <div className="rank-name">{item.name}</div>
-              {item.sub && <div className="rank-sub">{item.sub}</div>}
-            </div>
-          </div>
-          <div className="rank-count">
-            {fmtInt(item.plays)}
-            <span className="unit">plays</span>
-          </div>
-        </div>
+          }
+          name={item.name}
+          sub={item.sub || undefined}
+          ratio={item.plays / max}
+          count={item.plays}
+          unit={unit}
+        />
       ))}
     </div>
   )

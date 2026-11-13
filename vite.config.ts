@@ -40,7 +40,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'artwork',
-              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 1200, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],

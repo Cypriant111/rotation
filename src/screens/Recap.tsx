@@ -12,9 +12,12 @@ import {
   totals,
   yearRange,
 } from '../lib/stats'
-import { fmtInt, msToMin } from '../lib/format'
+import { fmtCompact, fmtInt, msToMin } from '../lib/format'
 import { Heatmap } from '../components/Heatmap'
-import { Chips } from '../components/Segmented'
+import { Segmented } from '../components/Segmented'
+import { RankList } from '../components/RankList'
+import { Cover } from '../components/Cover'
+import { Row } from '../components/Row'
 import { canvasToBlob, renderCard, shareCard } from '../lib/share'
 import { useFadeOnChange, usePresence } from '../lib/motion'
 import { SERVICE_NAME, serviceOf } from '../lib/types'
@@ -124,7 +127,7 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
         <h1>Recap</h1>
       </header>
       <main>
-        <Chips
+        <Segmented
           options={[
             { value: 'this-month', label: 'This month' },
             { value: 'last-month', label: 'Last month' },
@@ -134,112 +137,100 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
           value={period}
           onChange={setPeriod}
         />
-        <div ref={contentRef}>
+        <div ref={contentRef} className="stack">
         {empty ? (
           <div className="empty">
             <p>No plays in {range.label}.</p>
           </div>
         ) : (
           <>
-            <div className="card recap-hero">
-              <div className="period">{range.label}</div>
-              <div className="big">{fmtInt(msToMin(t.ms))}</div>
-              <div className="big-label">minutes listened{t.estimated ? ' (est.)' : ''}</div>
-              <div className="recap-strip">
-                <div className="item">
-                  <div className="v">{fmtInt(t.plays)}</div>
-                  <div className="l">plays</div>
-                </div>
-                <div className="item">
-                  <div className="v">{fmtInt(t.artists)}</div>
-                  <div className="l">artists</div>
-                </div>
-                <div className="item">
-                  <div className="v">{fmtInt(t.tracks)}</div>
-                  <div className="l">songs</div>
-                </div>
-                {ps.value > 1 && (
-                  <div className="item">
-                    <div className="v">{ps.value}</div>
-                    <div className="l">{ps.label}</div>
-                  </div>
-                )}
+            <div className="hero">
+              <div className="hero-period">{range.label}</div>
+              <div className="hero-line">
+                <span className="hero-num big">{fmtInt(msToMin(t.ms))}</span>
+                <span className="hero-label">minutes listened{t.estimated ? ' (est.)' : ''}</span>
               </div>
-              <div className="share-actions">
-                <button className="btn" onClick={() => openPreview('story')}>
-                  Share card
-                </button>
-                <button className="btn secondary" onClick={() => openPreview('square')}>
-                  Square
-                </button>
+            </div>
+            <div className="card strip">
+              <div className="strip-cell">
+                <div className="v">{fmtCompact(t.plays)}</div>
+                <div className="l">plays</div>
               </div>
+              <div className="strip-cell">
+                <div className="v">{fmtInt(t.artists)}</div>
+                <div className="l">artists</div>
+              </div>
+              <div className="strip-cell">
+                <div className="v">{fmtInt(t.tracks)}</div>
+                <div className="l">songs</div>
+              </div>
+              {ps.value > 1 && (
+                <div className="strip-cell">
+                  <div className="v">{ps.value}</div>
+                  <div className="l">{ps.label}</div>
+                </div>
+              )}
+            </div>
+            <div className="actions">
+              <button className="btn" onClick={() => openPreview('story')}>
+                Share card
+              </button>
+              <button className="btn secondary" onClick={() => openPreview('square')}>
+                Square
+              </button>
             </div>
             {artists.length > 0 && (
-              <div className="card">
-                <div className="card-title">On repeat</div>
-                <div className="rank-list">
-                  {artists.slice(0, 3).map((a, i) => (
-                    <div className="rank-row" key={a.name}>
-                      <div className="rank-num">{i + 1}</div>
-                      <div className="rank-main">
-                        <div className="rank-name">{a.name}</div>
-                      </div>
-                      <div className="rank-count">
-                        {fmtInt(a.plays)}
-                        <span className="unit">plays</span>
-                      </div>
-                    </div>
-                  ))}
+              <section className="block">
+                <div className="section-head">
+                  <h2>On repeat</h2>
                 </div>
-              </div>
+                <RankList items={artists.slice(0, 3)} kind="artist" animateKey={period} />
+              </section>
             )}
-            <div className="card">
-              <div className="card-title">When you listen</div>
-              <Heatmap matrix={matrix} />
-            </div>
+            <Heatmap title="When you listen" matrix={matrix} />
             {sk.skips > 0 && (
-              <div className="card">
-                <div className="card-title">
-                  Skipped
-                  <span className="aside">{Math.round(sk.skipRate * 100)}% of starts</span>
+              <section className="block">
+                <div className="section-head">
+                  <h2>Skipped</h2>
+                  <div className="section-aside">{Math.round(sk.skipRate * 100)}% of starts</div>
                 </div>
-                <div className="rank-list">
+                <div className="list">
                   {sk.topSkipped.map((item, i) => (
-                    <div className="rank-row" key={`${item.sub}|${item.name}`}>
-                      <div className="rank-num">{i + 1}</div>
-                      <div className="rank-main">
-                        <div className="rank-name">{item.name}</div>
-                        <div className="rank-sub">{item.sub}</div>
-                      </div>
-                      <div className="rank-count">
-                        {fmtInt(item.plays)}
-                        <span className="unit">skips</span>
-                      </div>
-                    </div>
+                    <Row
+                      key={`${item.sub}|${item.name}`}
+                      num={i + 1}
+                      art={<Cover kind="track" name={item.name} artist={item.artist} album={item.album} track={item.name} />}
+                      name={item.name}
+                      sub={item.sub}
+                      count={item.plays}
+                      unit="skips"
+                    />
                   ))}
                 </div>
-                <div className="note" style={{ marginTop: 6 }}>
+                <div className="note outside">
                   {fmtInt(sk.skips)} skips against {fmtInt(sk.plays)} full plays in {range.label}.
                 </div>
-              </div>
+              </section>
             )}
-            <div className="card">
-              <div className="card-title">Streaks</div>
-              <div className="recap-strip" style={{ marginTop: 4 }}>
-                <div className="item">
+            <section className="block">
+              <div className="section-head">
+                <h2>Streaks</h2>
+              </div>
+              <div className="card strip">
+                <div className="strip-cell">
                   <div className="v">{s.current}</div>
                   <div className="l">current days</div>
                 </div>
-                <div className="item">
+                <div className="strip-cell">
                   <div className="v">{s.longest}</div>
                   <div className="l">longest run</div>
                 </div>
-                <div className="item">
+                <div className="strip-cell">
                   <div className="v">{fmtInt(t.days)}</div>
                   <div className="l">days with music</div>
                 </div>
               </div>
-            </div>
+            </section>
           </>
         )}
         </div>
@@ -257,8 +248,8 @@ export function Recap({ showToast }: { showToast: (msg: string) => void }) {
             }}
           >
             <img className="card-preview" src={preview.url} alt={`${range.label} recap card`} />
-            <div className="share-actions">
-              <button className="btn full" onClick={doShare} autoFocus>
+            <div className="actions">
+              <button className="btn" onClick={doShare} autoFocus>
                 Share
               </button>
               <button className="btn secondary" onClick={closePreview}>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { fmtInt, msToMin } from '../lib/format'
 
 interface Props {
+  title: string
   /** 7 (Mon..Sun) x 24 matrix of ms */
   matrix: number[][]
 }
@@ -12,17 +13,17 @@ const RAMP = ['var(--heat-1)', 'var(--heat-2)', 'var(--heat-3)', 'var(--heat-4)'
 
 const CELL = 12.5
 const GAP = 2
-const LEFT = 16
+const LEFT = 18
 const TOP = 2
 
 /** When you listen: weekday x hour, sequential single-hue ramp. */
-export function Heatmap({ matrix }: Props) {
+export function Heatmap({ title, matrix }: Props) {
   const [sel, setSel] = useState<[number, number] | null>(null)
 
   const max = useMemo(() => Math.max(1, ...matrix.flat()), [matrix])
 
   const W = LEFT + 24 * (CELL + GAP)
-  const H = TOP + 7 * (CELL + GAP) + 14
+  const H = TOP + 7 * (CELL + GAP) + 16
 
   const bucket = (v: number) => {
     if (v <= 0) return -1
@@ -43,18 +44,20 @@ export function Heatmap({ matrix }: Props) {
   }
 
   return (
-    <div className="chart-wrap">
-      <div className="chart-tip" aria-live="polite">
-        {sel && selected !== null ? (
-          <>
-            <strong>{fmtInt(msToMin(selected))} min</strong>
-            {' · '}
-            {DAY_NAMES[sel[0]]} {sel[1]}:00–{sel[1] + 1}:00
-          </>
-        ) : (
-          ' '
-        )}
+    <section className="block">
+      <div className="section-head">
+        <h2>{title}</h2>
+        <div className="chart-tip" aria-live="polite">
+          {sel && selected !== null && (
+            <>
+              <strong>{fmtInt(msToMin(selected))} min</strong>
+              {' · '}
+              {DAY_NAMES[sel[0]]} {sel[1]}:00–{sel[1] + 1}:00
+            </>
+          )}
+        </div>
       </div>
+      <div className="card">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', display: 'block' }}
@@ -86,10 +89,10 @@ export function Heatmap({ matrix }: Props) {
         {DAYS.map((d, i) => (
           <text
             key={i}
-            x={LEFT - 6}
-            y={TOP + i * (CELL + GAP) + CELL - 3}
-            fontSize={9}
-            fill="var(--ink-3)"
+            x={LEFT - 10}
+            y={TOP + i * (CELL + GAP) + CELL - 2}
+            fontSize={12}
+            fill="var(--ink-2)"
             textAnchor="middle"
           >
             {d}
@@ -100,8 +103,8 @@ export function Heatmap({ matrix }: Props) {
             key={h}
             x={LEFT + h * (CELL + GAP)}
             y={H - 3}
-            fontSize={9}
-            fill="var(--ink-3)"
+            fontSize={12}
+            fill="var(--ink-2)"
           >
             {h}:00
           </text>
@@ -140,6 +143,7 @@ export function Heatmap({ matrix }: Props) {
         </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </section>
   )
 }

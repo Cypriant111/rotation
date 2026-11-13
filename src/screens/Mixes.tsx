@@ -5,15 +5,14 @@ import { useApp } from '../state/store'
 import { buildMixes, mixToText, searchUrl } from '../lib/affinity'
 import { SERVICE_NAME, serviceOf } from '../lib/types'
 import type { Mix } from '../lib/affinity'
-import { fmtInt } from '../lib/format'
-import { Artwork } from '../components/Artwork'
-import { RowBar } from '../components/RowBar'
+import { Cover } from '../components/Cover'
+import { Row } from '../components/Row'
 import { Mark } from '../components/Icons'
 
 const PREVIEW_ROWS = 6
 
 function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => void }) {
-  const { artFor, settings } = useApp()
+  const { settings } = useApp()
   const service = serviceOf(settings)
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -22,7 +21,6 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
   const listRef = useRef<HTMLDivElement>(null)
   useGrowOnShow(listRef, '.row-bar', mix.key, 'scaleX(0)')
   const rows = expanded ? mix.tracks : mix.tracks.slice(0, PREVIEW_ROWS)
-  // rows are ordered by score, so the bar shows score too (count stays as text)
   const maxScore = mix.tracks[0]?.score || 1
 
   async function copy() {
@@ -51,45 +49,35 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
   }
 
   return (
-    <div className="card">
-      <div className="mix-head">
-        <div>
-          <div className="mix-title">{mix.title}</div>
-          <div className="mix-blurb">{mix.blurb}</div>
-        </div>
+    <section className="block">
+      <div className="section-head stacked">
+        <h2>{mix.title}</h2>
+        <p className="section-blurb">{mix.blurb}</p>
       </div>
-      <div className="rank-list" ref={listRef}>
+      <div className="list" ref={listRef}>
         {rows.map((t, i) => (
-          <a
-            className="rank-row"
+          <Row
             key={`${t.artist}|${t.name}`}
             href={searchUrl(service, t)}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`${t.name} by ${t.artist} — open in ${SERVICE_NAME[service]}`}
-          >
-            <div className="row-body">
-              <RowBar ratio={t.score / maxScore} />
-              <div className="rank-num">{i + 1}</div>
-              <Artwork name={t.name} url={artFor(t.artist, t.album, t.name)} />
-              <div className="rank-main">
-                <div className="rank-name">{t.name}</div>
-                <div className="rank-sub">{t.artist}</div>
-              </div>
-            </div>
-            <div className="rank-count">
-              {fmtInt(t.count)}
-              <span className="unit">{mix.unit}</span>
-            </div>
-          </a>
+            label={`${t.name} by ${t.artist} — open in ${SERVICE_NAME[service]}`}
+            num={i + 1}
+            art={<Cover kind="track" name={t.name} artist={t.artist} album={t.album} track={t.name} />}
+            name={t.name}
+            sub={t.artist}
+            // rows are ordered by score, so the bar shows score; the count is a quiet note
+            ratio={t.score / maxScore}
+            count={t.count}
+            unit={mix.unit}
+            quiet
+          />
         ))}
+        {mix.tracks.length > PREVIEW_ROWS && (
+          <button className="list-more" onClick={() => setExpanded(!expanded)}>
+            {expanded ? 'Show less' : `Show all ${mix.tracks.length}`}
+          </button>
+        )}
       </div>
-      {mix.tracks.length > PREVIEW_ROWS && (
-        <button className="mix-more" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Show less' : `Show all ${mix.tracks.length}`}
-        </button>
-      )}
-      <div className="share-actions">
+      <div className="actions">
         <button className="btn secondary copy-btn" onClick={copy} ref={copyBtn} aria-live="polite">
           {copied ? (
             <>
@@ -104,7 +92,7 @@ function MixCard({ mix, showToast }: { mix: Mix; showToast: (msg: string) => voi
           Share
         </button>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -134,8 +122,11 @@ export function Mixes({ showToast }: { showToast: (msg: string) => void }) {
             {mixes.map((m) => (
               <MixCard key={m.key} mix={m} showToast={showToast} />
             ))}
-            <div className="card">
-              <div className="card-title">Make it a real playlist</div>
+            <section className="block">
+              <div className="section-head">
+                <h2>Make it a real playlist</h2>
+              </div>
+              <div className="card">
               {service === 'spotify' ? (
                 <div className="note" style={{ marginTop: 0 }}>
                   Rotation never signs in to your Spotify account, so it can’t create the playlist
@@ -162,7 +153,8 @@ export function Mixes({ showToast }: { showToast: (msg: string) => void }) {
                   </ol>
                 </div>
               )}
-            </div>
+              </div>
+            </section>
           </>
         )}
       </main>

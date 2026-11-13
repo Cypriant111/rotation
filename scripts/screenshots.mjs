@@ -129,7 +129,7 @@ try {
   const url = DEMO ? `${BASE}${BASE.includes('?') ? '&' : '?'}demo` : BASE
   await send('Page.navigate', { url })
   await waitFor(`!!document.querySelector('.tabbar')`)
-  if (DEMO) await waitFor(`!!document.querySelector('.demo-bar') && !!document.querySelector('.kpi-row')`)
+  if (DEMO) await waitFor(`!!document.querySelector('.demo-bar') && !!document.querySelector('.hero')`)
   await sleep(600)
   if (FAKE_INSTALL) {
     await evaluate(`(() => {

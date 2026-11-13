@@ -152,7 +152,7 @@ export function FirstRun({ goToSettings }: { goToSettings: () => void }) {
         </button>
       </div>
 
-      <div className="section-label">Get your own stats in 3 steps</div>
+      <h2 className="section-title">Get your own stats in 3 steps</h2>
       <div className="card service-card">
         <div className="step-title">What do you listen on?</div>
         <ServicePicker />

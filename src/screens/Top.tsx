@@ -4,7 +4,7 @@ import { useApp } from '../state/store'
 import type { PeriodKey } from '../lib/stats'
 import { PERIODS, periodStart, playsIn, topAlbums, topArtists, topTracks } from '../lib/stats'
 import { RankList } from '../components/RankList'
-import { Chips, Segmented } from '../components/Segmented'
+import { Segmented } from '../components/Segmented'
 
 type Kind = 'artists' | 'tracks' | 'albums'
 
@@ -29,33 +29,33 @@ export function Top() {
         <h1>Top</h1>
       </header>
       <main>
-        <Segmented
-          options={[
-            { value: 'artists', label: 'Artists' },
-            { value: 'tracks', label: 'Songs' },
-            { value: 'albums', label: 'Albums' },
-          ]}
-          value={kind}
-          onChange={setKind}
-        />
-        <Chips
-          options={PERIODS.map((p) => ({ value: p.key, label: p.label }))}
-          value={period}
-          onChange={setPeriod}
-        />
-        <div ref={listRef}>
+        <div className="seg-stack">
+          <Segmented
+            options={[
+              { value: 'artists', label: 'Artists' },
+              { value: 'tracks', label: 'Songs' },
+              { value: 'albums', label: 'Albums' },
+            ]}
+            value={kind}
+            onChange={setKind}
+          />
+          <Segmented
+            options={PERIODS.map((p) => ({ value: p.key, label: p.label }))}
+            value={period}
+            onChange={setPeriod}
+          />
+        </div>
+        <div ref={listRef} className="stack">
           {items.length === 0 ? (
             <div className="empty">
               <p>Nothing in this period yet.</p>
             </div>
           ) : (
-            <div className="card">
-              <RankList
-                items={items}
-                kind={kind === 'artists' ? 'artist' : kind === 'tracks' ? 'track' : 'album'}
-                animateKey={`${kind}|${period}`}
-              />
-            </div>
+            <RankList
+              items={items}
+              kind={kind === 'artists' ? 'artist' : kind === 'tracks' ? 'track' : 'album'}
+              animateKey={`${kind}|${period}`}
+            />
           )}
         </div>
       </main>

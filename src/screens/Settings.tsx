@@ -129,7 +129,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
         <h1>Settings</h1>
       </header>
       <main>
-        <div className="section-label">Your music service</div>
+        <h2 className="section-title">Your music service</h2>
         <div className="card">
           <ServicePicker />
           <div className="note">
@@ -138,7 +138,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           </div>
         </div>
 
-        <div className="section-label">Last.fm — automatic tracking</div>
+        <h2 className="section-title">Last.fm — automatic tracking</h2>
         <div className="card">
           {!connected ? (
             <>
@@ -160,7 +160,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
                 onChange={(e) => setApiKey(e.target.value)}
               />
               {connectError && <div className="inline-error">{connectError}</div>}
-              <div className="share-actions">
+              <div className="actions">
                 <button className="btn full" onClick={connect} disabled={connecting}>
                   {connecting ? 'Checking…' : 'Connect'}
                 </button>
@@ -269,7 +269,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
 
         {service === 'spotify' && (
           <>
-            <div className="section-label">Spotify export — full history</div>
+            <h2 className="section-title">Spotify export — full history</h2>
             <div className="card">
               <input
                 ref={spotifyRef}
@@ -334,7 +334,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
 
         {service === 'apple' && (
           <>
-        <div className="section-label">Apple Music export — full history</div>
+        <h2 className="section-title">Apple Music export — full history</h2>
         <div className="card">
           <input
             ref={fileRef}
@@ -387,7 +387,7 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           </>
         )}
 
-        <div className="section-label">Data</div>
+        <h2 className="section-title">Data</h2>
         <div className="card">
           <div className="settings-row">
             <div className="settings-main">
@@ -426,14 +426,14 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
           )}
         </div>
 
-        <div className="note" style={{ padding: '0 4px' }}>
+        <div className="note outside">
           Rotation keeps all data in this app’s local storage.
           {isIOS
             ? ' If you use it in Safari and then add it to your Home Screen, the installed app starts fresh — set up your sources from inside the installed app.'
             : ''}
         </div>
 
-        <div className="section-label">About</div>
+        <h2 className="section-title">About</h2>
         <div className="card about">
           <p>
             <strong>Your data stays on this device.</strong> Listening history, settings and your
@@ -441,13 +441,15 @@ export function Settings({ showToast }: { showToast: (msg: string) => void }) {
             analytics, no ads.
           </p>
           <p>
-            <strong>Network connections.</strong> The Last.fm API (ws.audioscrobbler.com), to fetch
-            your scrobbles with your own key, and Last.fm’s image server (lastfm.freetls.fastly.net)
-            for album artwork. The app itself loads from GitHub Pages.
+            <strong>Network connections.</strong> The Last.fm API (ws.audioscrobbler.com), with
+            your own key: to fetch your scrobbles, and to look up covers for the songs and albums
+            on screen, which sends their artist and title. Last.fm’s image server
+            (lastfm.freetls.fastly.net) for the cover pictures. Without a Last.fm key none of this
+            happens. The app itself loads from GitHub Pages.
           </p>
           <p>Rotation is not affiliated with Apple, Spotify or Last.fm.</p>
           <p>
-            Open source:{' '}
+            Source code:{' '}
             <a href="https://github.com/Cypriant111/rotation" target="_blank" rel="noreferrer">
               github.com/Cypriant111/rotation
             </a>

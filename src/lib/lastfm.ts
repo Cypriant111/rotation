@@ -282,3 +282,44 @@ export async function fetchAlbumArt(
 export function albumArtKey(artist: string, album: string): string {
   return norm(`${artist}\0${album}`)
 }
+
+/* ---------- single cover lookups (rows on screen that have no artwork yet) ---------- */
+
+type LfmImage = { size: string; '#text': string }
+
+/** Last.fm's grey-star "no image" picture; never worth showing */
+const PLACEHOLDER_IMAGE = '2a96cbd8b46e442fc41c2b86b821562f'
+
+export function pickImage(images: LfmImage[] | undefined): string | undefined {
+  const list = asArray(images)
+  const url = (list.find((i) => i.size === 'large') ?? list.at(-1))?.['#text']
+  if (!url || url.includes(PLACEHOLDER_IMAGE)) return undefined
+  return url
+}
+
+/** error 6 here means "no such track / album", which is an answer, not a failure */
+async function lookup<T>(params: Params, apiKey: string): Promise<T | undefined> {
+  try {
+    return await call<T>(params, apiKey)
+  } catch (e) {
+    if (e instanceof LastfmError && e.code === 6) return undefined
+    throw e
+  }
+}
+
+/** Cover of the album a song is on, if Last.fm knows one. */
+export async function lookupTrackImage(artist: string, track: string, apiKey: string): Promise<string | undefined> {
+  const data = await lookup<{ track?: { album?: { image?: LfmImage[] } } }>(
+    { method: 'track.getInfo', artist, track, autocorrect: '1' },
+    apiKey,
+  )
+  return pickImage(data?.track?.album?.image)
+}
+
+export async function lookupAlbumImage(artist: string, album: string, apiKey: string): Promise<string | undefined> {
+  const data = await lookup<{ album?: { image?: LfmImage[] } }>(
+    { method: 'album.getInfo', artist, album, autocorrect: '1' },
+    apiKey,
+  )
+  return pickImage(data?.album?.image)
+}

@@ -5,13 +5,14 @@ import { daySeries, periodStart, playsIn, totals } from '../lib/stats'
 import { fmtAgo, fmtInt, msToMin } from '../lib/format'
 import { BarChart } from '../components/BarChart'
 import { Segmented } from '../components/Segmented'
-import { Artwork } from '../components/Artwork'
+import { Cover } from '../components/Cover'
+import { Row } from '../components/Row'
 import { FirstRun } from '../components/FirstRun'
 
 type HomePeriod = '7d' | '30d'
 
 export function Home({ goToSettings }: { goToSettings: () => void }) {
-  const { plays, durations, artFor, artists, sync, syncNow, settings } = useApp()
+  const { plays, durations, artists, sync, syncNow, settings } = useApp()
   const [period, setPeriod] = useState<HomePeriod>('7d')
   const periodRef = useRef<HTMLDivElement>(null)
   useFadeOnChange(periodRef, period)
@@ -55,40 +56,42 @@ export function Home({ goToSettings }: { goToSettings: () => void }) {
               value={period}
               onChange={setPeriod}
             />
-            <div ref={periodRef}>
-            <div className="kpi-row">
-              <div className="stat-tile">
-                <div className="value">{fmtInt(msToMin(t.ms))}</div>
-                <div className="label">minutes{t.estimated ? ' (est.)' : ''}</div>
+            <div ref={periodRef} className="stack">
+              <div className="hero">
+                <div className="hero-line">
+                  <span className="hero-num underlined">{fmtInt(msToMin(t.ms))}</span>
+                  <span className="hero-label">minutes{t.estimated ? ' (est.)' : ''}</span>
+                </div>
+                <div className="hero-stats">
+                  <div className="hero-stat">
+                    <span className="num">{fmtInt(t.plays)}</span>
+                    <span className="label">plays</span>
+                  </div>
+                  <div className="hero-stat">
+                    <span className="num">{fmtInt(t.artists)}</span>
+                    <span className="label">artists</span>
+                  </div>
+                </div>
               </div>
-              <div className="stat-tile">
-                <div className="value">{fmtInt(t.plays)}</div>
-                <div className="label">plays</div>
-              </div>
-              <div className="stat-tile">
-                <div className="value">{fmtInt(t.artists)}</div>
-                <div className="label">artists</div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-title">Minutes by day</div>
-              <BarChart points={series} animateKey={period} />
-            </div>
+              <BarChart title="Minutes by day" points={series} animateKey={period} />
             </div>
             {recent.length > 0 && (
-              <div className="card">
-                <div className="card-title">Recent</div>
-                {recent.map((p) => (
-                  <div className="recent-row" key={p.id}>
-                    <Artwork name={p.track} url={artFor(p.artist, p.album, p.track)} />
-                    <div className="rank-main">
-                      <div className="rank-name">{p.track}</div>
-                      <div className="rank-sub">{p.artist}</div>
-                    </div>
-                    <div className="recent-time">{fmtAgo(p.ts)}</div>
-                  </div>
-                ))}
-              </div>
+              <section className="block">
+                <div className="section-head">
+                  <h2>Recent</h2>
+                </div>
+                <div className="list">
+                  {recent.map((p) => (
+                    <Row
+                      key={p.id}
+                      art={<Cover kind="track" name={p.track} artist={p.artist} album={p.album} track={p.track} />}
+                      name={p.track}
+                      sub={p.artist}
+                      aside={fmtAgo(p.ts)}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
           </>
         )}

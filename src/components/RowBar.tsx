@@ -1,7 +1,7 @@
 /**
- * The bar behind a ranked row. It lives inside `.row-body`, so it can never
- * reach under the count column. Width is a transform (scaleX) so it can grow
- * from zero without layout work; see `.row-bar` in index.css.
+ * The thin bar under a row's name: this row against the first one.
+ * Length is a transform (scaleX) so it can grow from zero without layout
+ * work; see `.row-bar` in index.css.
  */
 export function RowBar({ ratio }: { ratio: number }) {
   const r = Number.isFinite(ratio) ? Math.min(1, Math.max(0.04, ratio)) : 0.04

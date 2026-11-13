@@ -4,6 +4,7 @@ import type { DayPoint } from '../lib/stats'
 import { fmtDayKey, fmtDayKeyFull, fmtInt, msToMin, weekdayNarrow } from '../lib/format'
 
 interface Props {
+  title: string
   points: DayPoint[]
   /** columns grow from the axis when this changes (and on first show) */
   animateKey?: unknown
@@ -18,13 +19,19 @@ function niceCeil(n: number): number {
   return 10 * pow
 }
 
-const H = 150
-const PLOT_H = 118
-const AXIS_Y = PLOT_H + 4
 const W = 340
+/** right-hand column for the scale labels */
+const AXIS_W = 28
+const PLOT_W = W - AXIS_W
+const TOP = 8
+const PLOT_H = 120
+const BASE = TOP + PLOT_H
+const H = BASE + 20
+/** labels closer than this would overprint each other */
+const LABEL_CLEAR = 13
 
 /** Daily listening minutes. Single series, accent hue, tap for values. */
-export function BarChart({ points, animateKey }: Props) {
+export function BarChart({ title, points, animateKey }: Props) {
   const [sel, setSel] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   useGrowOnShow(svgRef, '.chart-bar', animateKey, 'scaleY(0)')
@@ -32,28 +39,28 @@ export function BarChart({ points, animateKey }: Props) {
   // stale selection points at the wrong day after a period switch
   useEffect(() => setSel(null), [points])
 
-  const { max, maxIdx } = useMemo(() => {
-    let max = 0
-    let maxIdx = 0
-    points.forEach((p, i) => {
-      if (p.ms > max) {
-        max = p.ms
-        maxIdx = i
-      }
-    })
-    return { max: niceCeil(msToMin(max)), maxIdx }
+  const { max, avg } = useMemo(() => {
+    let peak = 0
+    let sum = 0
+    for (const p of points) {
+      if (p.ms > peak) peak = p.ms
+      sum += p.ms
+    }
+    return { max: niceCeil(msToMin(peak)), avg: points.length > 0 ? sum / points.length / 60_000 : 0 }
   }, [points])
 
   const n = points.length
   if (n === 0) return null
-  const slot = W / n
+  const slot = PLOT_W / n
   const barW = Math.min(24, Math.max(3, slot - 2)) // >=2px surface gap between bars
   const x = (i: number) => i * slot + (slot - barW) / 2
-  const y = (min: number) => PLOT_H - (min / max) * (PLOT_H - 18)
+  const y = (min: number) => BASE - (min / max) * PLOT_H
 
   const selected = sel !== null ? points[sel] : null
   const showWeekdays = n <= 7
   const cap = Math.min(barW / 2, 4)
+  const avgY = y(avg)
+  const showAvg = avg > 0
 
   // nearest-column tap layer: the whole plot is the hit target
   const onTap = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -63,24 +70,23 @@ export function BarChart({ points, animateKey }: Props) {
     setSel(sel === i ? null : i)
   }
 
-  // clamp the peak label so it never leaves the viewBox
-  const peakLabelX = Math.min(W - 14, Math.max(14, x(maxIdx) + barW / 2))
+  const axisLabel = { fontSize: 11.5, fill: 'var(--ink-2)', fontVariant: 'tabular-nums' } as const
 
   return (
-    <div className="chart-wrap">
-      <div className="chart-tip" aria-live="polite">
-        {selected ? (
-          <>
-            <strong>{fmtInt(msToMin(selected.ms))} min</strong>
-            {' · '}
-            {selected.plays} {selected.plays === 1 ? 'play' : 'plays'}
-            {' · '}
-            {fmtDayKeyFull(selected.dayStart)}
-          </>
-        ) : (
-          ' '
-        )}
+    <section className="block">
+      <div className="section-head">
+        <h2>{title}</h2>
+        <div className="chart-tip" aria-live="polite">
+          {selected && (
+            <>
+              <strong>{fmtInt(msToMin(selected.ms))} min</strong>
+              {' · '}
+              {fmtDayKeyFull(selected.dayStart)}
+            </>
+          )}
+        </div>
       </div>
+      <div className="card">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -89,24 +95,13 @@ export function BarChart({ points, animateKey }: Props) {
         aria-label="Minutes listened per day; values in the table below"
         onClick={onTap}
       >
-        {/* recessive grid behind the bars */}
-        {[0.5, 1].map((f) => (
-          <line
-            key={f}
-            x1={0}
-            x2={W}
-            y1={y(max * f)}
-            y2={y(max * f)}
-            stroke="var(--hairline)"
-            strokeWidth={1}
-          />
-        ))}
-        <line x1={0} x2={W} y1={PLOT_H} y2={PLOT_H} stroke="var(--hairline)" strokeWidth={1} />
+        {/* scale: top line at the maximum, baseline at zero */}
+        <line x1={0} x2={PLOT_W} y1={TOP} y2={TOP} stroke="var(--hairline)" strokeWidth={1} />
+        <line x1={0} x2={PLOT_W} y1={BASE} y2={BASE} stroke="var(--hairline)" strokeWidth={1} />
 
         {points.map((p, i) => {
           const min = msToMin(p.ms)
-          const by = min > 0 ? y(min) : PLOT_H
-          const h = PLOT_H - by
+          const h = min > 0 ? BASE - y(min) : 0
           return (
             <g key={p.dayStart}>
               {h > 0 && (
@@ -114,8 +109,8 @@ export function BarChart({ points, animateKey }: Props) {
                   className="chart-bar"
                   d={
                     h > cap
-                      ? `M${x(i)},${PLOT_H} v${-(h - cap)} q0,${-cap} ${cap},${-cap} h${barW - cap * 2} q${cap},0 ${cap},${cap} v${h - cap} z`
-                      : `M${x(i)},${PLOT_H} v${-h} h${barW} v${h} z`
+                      ? `M${x(i)},${BASE} v${-(h - cap)} q0,${-cap} ${cap},${-cap} h${barW - cap * 2} q${cap},0 ${cap},${cap} v${h - cap} z`
+                      : `M${x(i)},${BASE} v${-h} h${barW} v${h} z`
                   }
                   fill="var(--accent)"
                   opacity={sel === null || sel === i ? 1 : 0.4}
@@ -124,9 +119,9 @@ export function BarChart({ points, animateKey }: Props) {
               {showWeekdays && (
                 <text
                   x={x(i) + barW / 2}
-                  y={AXIS_Y + 10}
-                  fontSize={10}
-                  fill={sel === i ? 'var(--ink)' : 'var(--ink-3)'}
+                  y={BASE + 15}
+                  fontSize={11.5}
+                  fill={sel === i ? 'var(--ink)' : 'var(--ink-2)'}
                   textAnchor="middle"
                 >
                   {weekdayNarrow(p.dayStart)}
@@ -134,10 +129,10 @@ export function BarChart({ points, animateKey }: Props) {
               )}
               {!showWeekdays && (i === 0 || i === n - 1 || i === Math.floor(n / 2)) && (
                 <text
-                  x={x(i) + barW / 2}
-                  y={AXIS_Y + 10}
-                  fontSize={10}
-                  fill="var(--ink-3)"
+                  x={i === 0 ? 0 : i === n - 1 ? PLOT_W : x(i) + barW / 2}
+                  y={BASE + 15}
+                  fontSize={11.5}
+                  fill="var(--ink-2)"
                   textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
                 >
                   {fmtDayKey(p.dayStart)}
@@ -147,36 +142,33 @@ export function BarChart({ points, animateKey }: Props) {
           )
         })}
 
-        {/* tick + peak labels painted last so no bar can cover them */}
-        {[0.5, 1].map((f) => (
-          <text
-            key={f}
-            x={W}
-            y={y(max * f) - 3}
-            fontSize={9.5}
-            fill="var(--ink-3)"
-            textAnchor="end"
-            fontVariant="tabular-nums"
-            stroke="var(--card)"
-            strokeWidth={3}
-            paintOrder="stroke"
-          >
-            {fmtInt(max * f)}
+        {/* average across the period, drawn over the bars */}
+        {showAvg && (
+          <line
+            x1={0}
+            x2={PLOT_W}
+            y1={avgY}
+            y2={avgY}
+            stroke="var(--ink-3)"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+        )}
+
+        {/* scale labels in their own column, so no bar can run under them */}
+        {(!showAvg || avgY - TOP >= LABEL_CLEAR) && (
+          <text x={PLOT_W + 6} y={TOP + 4} {...axisLabel}>
+            {fmtInt(max)}
           </text>
-        ))}
-        {msToMin(points[maxIdx]?.ms ?? 0) > 0 && sel === null && (
-          <text
-            x={peakLabelX}
-            y={y(msToMin(points[maxIdx].ms)) - 5}
-            fontSize={10}
-            fontWeight={600}
-            fill="var(--ink-2)"
-            textAnchor="middle"
-            stroke="var(--card)"
-            strokeWidth={3}
-            paintOrder="stroke"
-          >
-            {fmtInt(msToMin(points[maxIdx].ms))}
+        )}
+        {showAvg && (
+          <text x={PLOT_W + 6} y={avgY + 4} {...axisLabel}>
+            avg
+          </text>
+        )}
+        {(!showAvg || BASE - avgY >= LABEL_CLEAR) && (
+          <text x={PLOT_W + 6} y={BASE + 4} {...axisLabel}>
+            0
           </text>
         )}
       </svg>
@@ -204,6 +196,7 @@ export function BarChart({ points, animateKey }: Props) {
         </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </section>
   )
 }

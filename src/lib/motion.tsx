@@ -130,13 +130,13 @@ export function usePresence(show: boolean, exitMs: number): [boolean, boolean] {
 
 /* ---------- press feedback ---------- */
 
-const PRESSABLE = '.btn, .chips button, .segmented button, a.rank-row, .mix-more'
+const PRESSABLE = '.btn, .segmented button, a.row, .list-more'
 /** a touch that starts a scroll is cancelled well before this */
 const PRESS_DELAY_MS = 80
 const MOVE_SLOP_PX = 6
 
 /**
- * Scale-on-press for buttons, period pills, segments and Mixes rows. Done in
+ * Scale-on-press for buttons, segments and Mixes rows. Done in
  * JS rather than :active so that a touch that turns into a scroll never
  * scales the row under the finger: the state waits a beat, and any movement
  * or pointercancel (the browser taking over to scroll) drops it.
