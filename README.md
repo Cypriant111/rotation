@@ -143,9 +143,10 @@ change `base` in `vite.config.ts` and the icon/start_url paths in
 ## Privacy
 
 - All listening data lives in IndexedDB on your device.
-- The only network calls are to the Last.fm API (your scrobbles, with your own
-  API key) and Last.fm's image CDN for album artwork. No Apple or Spotify
-  login, no Spotify Web API.
+- The only network calls are to the Last.fm API, with your own API key (your
+  scrobbles, and cover lookups that send the artist and title of the songs
+  and albums on screen), and Last.fm's image CDN for the covers. Without a
+  Last.fm key there are none. No Apple or Spotify login, no Spotify Web API.
 - Settings ▸ Data lets you export everything as JSON or delete it per source.
 
 Rotation is not affiliated with Apple, Spotify or Last.fm.
